@@ -10,21 +10,27 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Database\Factories\ItemFactory;
 use RoundlyConsulting\Shops\Orders\Concerns\BelongsToOrder;
+use RoundlyConsulting\Shops\Orders\Concerns\BelongsToVariant;
 use RoundlyConsulting\Shops\Support\Casts\MoneyCast;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @property int $id
  * @property int $order_id
+ * @property int|null $product_id
+ * @property int|null $product_variant_id
  * @property string $name
+ * @property string|null $sku
  * @property int $quantity
  * @property Money $price
  * @property string $currency
+ * @property string $tax_class
  */
 final class Item extends Model
 {
     use BelongsToOrder;
     use BelongsToShop;
+    use BelongsToVariant;
     /** @use HasFactory<ItemFactory> */
     use HasFactory;
     use SoftDeletes;

@@ -22,9 +22,11 @@ final class ItemFactory extends Factory
 
         return [
             'name' => fake()->words(3, true),
+            'sku' => mb_strtoupper(fake()->bothify('SKU-####')),
             'quantity' => fake()->numberBetween(1, 10),
             'price' => Money::of(fake()->numberBetween(100, 5000), $currency),
             'currency' => $currency,
+            'tax_class' => 'standard',
             'order_id' => Order::factory(),
         ];
     }

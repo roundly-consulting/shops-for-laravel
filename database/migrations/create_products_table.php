@@ -16,8 +16,6 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug');
             $table->text('description')->nullable();
-            $table->integer('price');
-            $table->string('currency');
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->softDeletes();

@@ -17,31 +17,37 @@ final class ProductFactory extends Factory
 
     public function definition(): array
     {
-        $currency = fake()->randomElement(['EUR', 'USD']);
-
         return [
             'name' => fake()->unique()->words(3, true),
             'description' => fake()->paragraph(),
-            'price' => Money::of(fake()->numberBetween(100, 5000), $currency),
-            'currency' => $currency,
             'published_at' => fake()->optional()->dateTime(),
         ];
     }
 
-    public function withUsdPrice(string $price): static
+    /**
+     * Override the auto-created default variant's price after the product is
+     * made.
+     */
+    public function withPrice(string $price, string $currency = 'EUR'): static
     {
-        return $this->state(fn (array $attributes): array => [
-            'price' => Money::USD($price),
-            'currency' => 'USD',
-        ]);
+        return $this->afterCreating(function (Product $product) use ($price, $currency): void {
+            $product->defaultVariant?->update([
+                'price' => Money::of($price, $currency),
+                'currency' => $currency,
+            ]);
+        });
     }
 
-    public function withEurPrice(string $price): static
+    /**
+     * Attach an explicit variant and drop the implicitly created default, so
+     * the product ships only the variant(s) the caller asked for.
+     */
+    public function withVariant(ProductVariantFactory $variant): static
     {
-        return $this->state(fn (array $attributes): array => [
-            'price' => Money::EUR($price),
-            'currency' => 'EUR',
-        ]);
+        return $this->afterCreating(function (Product $product) use ($variant): void {
+            $product->variants()->forceDelete();
+            $variant->for($product)->create();
+        });
     }
 
     public function published(): static

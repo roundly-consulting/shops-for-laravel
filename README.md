@@ -71,15 +71,47 @@ use RoundlyConsulting\Shops\Support\Money\Money;
 $category = Category::create(['name' => 'Beverages']);
 // $category->slug === 'beverages'
 
-$product = Product::create([
-    'name' => 'Sparkling Water',
-    'price' => 199,        // stored as the minor unit (cents)
-    'currency' => 'EUR',
-]);
-
+$product = Product::create(['name' => 'Sparkling Water']);
 $product->categories()->attach($category);
 
-$product->price; // RoundlyConsulting\Shops\Support\Money\Money (199 EUR)
+$product->price; // RoundlyConsulting\Shops\Support\Money\Money — proxied from the default variant
+```
+
+### Variants, SKUs and options
+
+Every sellable unit is a `ProductVariant` with its own `sku`, `price`, `currency`, tax class,
+and stock. A product created without explicit variants automatically gets **one default
+variant**, so simple single-SKU products stay a one-liner; `$product->price` proxies the
+default variant's price.
+
+```php
+use RoundlyConsulting\Shops\Support\Money\Money;
+
+// Add explicit variants:
+$small = $product->variants()->create([
+    'sku' => 'WATER-0.5L', 'price' => Money::EUR(199), 'currency' => 'EUR', 'stock' => 50,
+]);
+$large = $product->variants()->create([
+    'sku' => 'WATER-1L', 'price' => Money::EUR(299), 'currency' => 'EUR', 'stock' => 30,
+]);
+
+$product->defaultVariant;       // lowest-position variant
+$small->inStock(10);            // bool — respects track_stock and reserved quantity
+$small->availableStock();       // stock - reserved
+```
+
+Options (e.g. Size, Colour) compose variants. Resolve a variant from a set of option values:
+
+```php
+use RoundlyConsulting\Shops\Products\ProductOption;
+
+$size = ProductOption::create(['product_id' => $product->id, 'name' => 'Size']);
+$small = $size->values()->create(['value' => 'S']);
+$large = $size->values()->create(['value' => 'L']);
+
+$variant->optionValues()->attach([$small->id]);
+
+$product->variantFor([$small->id]); // ?ProductVariant
 ```
 
 ### Money value object
