@@ -50,10 +50,15 @@ it('only requires whitelisted runtime dependencies', function (): void {
     /** @var array<string, string> $require */
     $require = json_decode((string) file_get_contents(__DIR__.'/../composer.json'), true)['require'] ?? [];
 
-    $disallowed = array_filter(
+    // The CI matrix injects testing tooling (orchestra/testbench, pest, …) into
+    // "require" via `composer require`; the policy only forbids third-party
+    // *runtime* dependencies, so allow whitelisted vendors plus that tooling.
+    $allowed = '#^(php$|ext-|illuminate/|laravel/|symfony/|orchestra/|pestphp/|nunomaduro/|larastan/|phpstan/)#';
+
+    $disallowed = array_values(array_filter(
         array_keys($require),
-        fn (string $package): bool => ! preg_match('#^(php$|ext-|illuminate/|laravel/|symfony/)#', $package),
-    );
+        fn (string $package): bool => preg_match($allowed, $package) !== 1,
+    ));
 
     expect($disallowed)->toBe([]);
 });
