@@ -348,6 +348,39 @@ $discounted = app(UseCoupon::class)->execute($coupon, Money::EUR(1000));
 If the coupon cannot be applied, the original amount is returned unchanged and no usage is
 recorded.
 
+### Payment & shipping drivers
+
+The package defines payment and shipping as **driver contracts** and ships no vendor SDK. Bind
+your own implementation via config; the defaults work zero-config (a null gateway that always
+succeeds, and free shipping):
+
+```php
+use RoundlyConsulting\Shops\Contracts\PaymentGateway;
+use RoundlyConsulting\Shops\Orders\Order;
+use RoundlyConsulting\Shops\Payments\PaymentResult;
+use RoundlyConsulting\Shops\Support\Money\Money;
+
+final class StripeGateway implements PaymentGateway
+{
+    public function charge(Order $order): PaymentResult { /* … */ }
+    public function refund(Order $order, Money $amount): PaymentResult { /* … */ }
+}
+```
+
+Register it in `config/shops.php` (`payment.gateway` / `shipping.method`). Charge an order
+through the bound gateway with `ChargeOrderAction` — on success it transitions the order to
+`Paid`:
+
+```php
+use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
+use RoundlyConsulting\Shops\Orders\Actions\QuoteShippingAction;
+
+$result = app(ChargeOrderAction::class)->execute($order); // PaymentResult
+$quote  = app(QuoteShippingAction::class)->execute($order, $destinationAddress); // Money
+```
+
+A failed charge leaves the order's status unchanged.
+
 ## Testing
 
 ```bash

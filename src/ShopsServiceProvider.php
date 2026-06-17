@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops;
 
 use Illuminate\Support\ServiceProvider;
+use RoundlyConsulting\Shops\Contracts\PaymentGateway;
+use RoundlyConsulting\Shops\Contracts\ShippingMethod;
 use RoundlyConsulting\Shops\Contracts\TaxResolver;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\NumberGenerator;
+use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
+use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;
 use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
 
 final class ShopsServiceProvider extends ServiceProvider
@@ -25,6 +29,16 @@ final class ShopsServiceProvider extends ServiceProvider
         $taxResolver = config('shops.tax.resolver', ConfigTaxResolver::class);
 
         $this->app->bind(TaxResolver::class, $taxResolver);
+
+        /** @var class-string<PaymentGateway> $gateway */
+        $gateway = config('shops.payment.gateway', NullPaymentGateway::class);
+
+        $this->app->bind(PaymentGateway::class, $gateway);
+
+        /** @var class-string<ShippingMethod> $shipping */
+        $shipping = config('shops.shipping.method', FreeShippingMethod::class);
+
+        $this->app->bind(ShippingMethod::class, $shipping);
     }
 
     public function boot(): void

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
+use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
+use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;
 use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
 
 return [
@@ -95,7 +97,7 @@ return [
     */
 
     'payment' => [
-        'gateway' => env('SHOPS_PAYMENT_GATEWAY'),
+        'gateway' => env('SHOPS_PAYMENT_GATEWAY', NullPaymentGateway::class),
     ],
 
     /*
@@ -110,7 +112,7 @@ return [
     */
 
     'shipping' => [
-        'method' => env('SHOPS_SHIPPING_METHOD'),
+        'method' => env('SHOPS_SHIPPING_METHOD', FreeShippingMethod::class),
     ],
 
     /*
