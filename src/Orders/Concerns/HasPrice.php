@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Shops\Contracts\Coupon;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
+use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
+use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
@@ -25,23 +27,26 @@ trait HasPrice
             /** @var iterable<Item> $items */
             $items = $this->items;
 
-            $prices = [];
+            $lines = [];
 
             foreach ($items as $item) {
-                $prices[] = $item->price;
+                $lines[] = new PriceLine(
+                    unitPrice: $item->price,
+                    quantity: $item->quantity,
+                    taxClass: (string) ($item->getAttribute('tax_class') ?? 'standard'),
+                );
             }
 
-            $price = $prices === []
-                ? Money::EUR(0)
-                : Money::sum(...$prices);
-
             $coupon = $this->coupon;
+            $currency = (string) config('shops.pricing.default_currency', 'EUR');
 
             return new Price(
-                price: $price,
-                shipping: Money::EUR(0),
-                taxRate: (int) config('shops.tax_rate'),
+                lines: $lines,
+                shipping: Money::zero($currency),
+                priceType: PriceType::from((string) config('shops.pricing.price_type', 'gross')),
+                taxResolver: null,
                 coupon: $coupon instanceof Coupon ? $coupon : null,
+                currency: $currency,
             );
         });
     }

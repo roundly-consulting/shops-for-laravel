@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Support\Money;
 
 use RoundlyConsulting\Shops\Exceptions\CurrencyMismatchException;
+use RoundlyConsulting\Shops\Exceptions\DivisionByZeroException;
 
 /**
  * Minimal immutable money value object that stores an integer amount in the
  * currency's minor unit (e.g. cents), implemented natively with no third-party
  * money dependency.
+ *
+ * Calculations that do not land on a whole minor unit round half-up (PHP's
+ * default `round()` behaviour), matching standard retail rounding.
  */
 final readonly class Money
 {
@@ -38,6 +42,11 @@ final readonly class Money
         return self::of($amount, 'USD');
     }
 
+    public static function zero(string $currencyCode): self
+    {
+        return self::of(0, $currencyCode);
+    }
+
     /**
      * Sum an arbitrary number of money values; every operand must share the
      * first operand's currency.
@@ -56,6 +65,14 @@ final readonly class Money
     public function getAmount(): string
     {
         return (string) $this->amount;
+    }
+
+    /**
+     * The raw integer amount in the currency's minor unit.
+     */
+    public function getMinorAmount(): int
+    {
+        return $this->amount;
     }
 
     public function getCurrency(): Currency
@@ -84,7 +101,36 @@ final readonly class Money
 
     public function divide(int|float $divisor): self
     {
+        if ((float) $divisor === 0.0) {
+            throw DivisionByZeroException::make();
+        }
+
         return new self((int) round($this->amount / $divisor), $this->currency);
+    }
+
+    public function isZero(): bool
+    {
+        return $this->amount === 0;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->amount < 0;
+    }
+
+    public function isPositive(): bool
+    {
+        return $this->amount > 0;
+    }
+
+    /**
+     * Compare two money values of the same currency, returning -1, 0 or 1.
+     */
+    public function compareTo(self $other): int
+    {
+        $this->assertSameCurrency($other);
+
+        return $this->amount <=> $other->amount;
     }
 
     public function equals(self $other): bool

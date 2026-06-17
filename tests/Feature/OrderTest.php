@@ -21,31 +21,32 @@ it('has relationships', function (): void {
         ->items()->toBeInstanceOf(HasMany::class);
 });
 
-it('calculates total order price from items', function (): void {
+it('calculates total order price from items respecting quantity', function (): void {
     $order = Order::factory()->create();
 
-    Item::factory()->for($order)->withEurPrice('1000')->create();
-    Item::factory()->for($order)->withEurPrice('300')->create();
+    Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 2])->create();
+    Item::factory()->for($order)->withEurPrice('300')->state(['quantity' => 1])->create();
 
     expect($order->refresh()->price)
         ->toBeInstanceOf(Price::class)
-        ->and($order->price->price)
+        ->and($order->price->getSubtotal())
         ->toBeInstanceOf(Money::class)
-        ->getAmount()->toBe('1300')
+        ->getAmount()->toBe('2300')
         ->getCurrency()->getCode()->toBe('EUR');
 });
 
 it('returns a zero price for an order without items', function (): void {
     $order = Order::factory()->create();
 
-    expect($order->price->price->getAmount())->toBe('0');
+    expect($order->price->getSubtotal()->getAmount())->toBe('0')
+        ->and($order->price->getSubtotal()->getCurrency()->getCode())->toBe('EUR');
 });
 
 it('applies a coupon discount to the order price', function (): void {
     $coupon = TestCoupon::factory()->create(['value' => 10]);
     $order = Order::factory()->create(['coupon_id' => $coupon->id]);
 
-    Item::factory()->for($order)->withEurPrice('1000')->create();
+    Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
 
     expect($order->refresh()->price->getPriceAfterDiscount()->getAmount())->toBe('900');
 });
