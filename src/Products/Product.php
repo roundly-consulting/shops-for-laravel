@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Concerns\HasSlug;
+use RoundlyConsulting\Shops\Concerns\HasTranslations;
+use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\ProductFactory;
 use RoundlyConsulting\Shops\Products\Concerns\BelongsToManyCategories;
 use RoundlyConsulting\Shops\Products\Concerns\HasOptions;
@@ -18,7 +20,6 @@ use RoundlyConsulting\Shops\Products\Concerns\HasVariants;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
- * @property int $id
  * @property string $name
  * @property string $slug
  * @property string|null $description
@@ -28,7 +29,7 @@ use RoundlyConsulting\Shops\Support\Money\Money;
  * @property-read ProductVariant|null $defaultVariant
  * @property-read Collection<int, ProductOption> $options
  */
-final class Product extends Model
+final class Product extends Model implements Translatable
 {
     use BelongsToManyCategories;
     use BelongsToShop;
@@ -36,6 +37,7 @@ final class Product extends Model
     use HasFactory;
     use HasOptions;
     use HasSlug;
+    use HasTranslations;
     use HasVariants;
     use SoftDeletes;
 
@@ -49,12 +51,23 @@ final class Product extends Model
     }
 
     /**
+     * @return list<string>
+     */
+    public function translatableAttributes(): array
+    {
+        return ['name', 'slug', 'description'];
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
             'published_at' => 'datetime',
+            'name' => 'array',
+            'slug' => 'array',
+            'description' => 'array',
         ];
     }
 }

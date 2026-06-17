@@ -77,6 +77,24 @@ $product->categories()->attach($category);
 $product->price; // RoundlyConsulting\Shops\Support\Money\Money — proxied from the default variant
 ```
 
+`name`, `slug`, and `description` on products and categories are **translatable**, stored as
+native per-locale JSON. Reads transparently return the current locale's value (falling back to
+`shops.locales.fallback`); a plain-string write is stored under the current locale, so simple
+single-language stores need no extra work:
+
+```php
+$product->setTranslation('name', 'en', 'Sparkling Water');
+$product->setTranslation('name', 'sk', 'Perlivá voda');
+$product->save();
+
+app()->setLocale('sk');
+$product->name;                       // "Perlivá voda"
+$product->getTranslation('name', 'en'); // "Sparkling Water"
+$product->getTranslations('name');      // ['en' => '...', 'sk' => '...']
+```
+
+Slugs are generated per locale from the name's translations.
+
 ### Variants, SKUs and options
 
 Every sellable unit is a `ProductVariant` with its own `sku`, `price`, `currency`, tax class,

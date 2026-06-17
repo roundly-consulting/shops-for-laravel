@@ -13,15 +13,12 @@ return new class extends Migration
         Schema::create('product_categories', function (Blueprint $table) {
             $table->id();
             $table->nullableMorphs('shop');
-            $table->string('name');
-            $table->string('slug');
-            $table->text('description')->nullable();
+            $table->json('name');
+            $table->json('slug');
+            $table->json('description')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
-
-            $table->unique(['name', 'shop_id', 'shop_type']);
-            $table->unique(['slug', 'shop_id', 'shop_type']);
         });
     }
 };

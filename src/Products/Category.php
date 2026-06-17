@@ -10,21 +10,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Concerns\HasSlug;
+use RoundlyConsulting\Shops\Concerns\HasTranslations;
+use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\CategoryFactory;
 
 /**
- * @property int $id
  * @property string $name
  * @property string $slug
  * @property string|null $description
  * @property CarbonInterface|null $published_at
  */
-final class Category extends Model
+final class Category extends Model implements Translatable
 {
     use BelongsToShop;
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
     use HasSlug;
+    use HasTranslations;
     use SoftDeletes;
 
     protected $table = 'product_categories';
@@ -37,12 +39,23 @@ final class Category extends Model
     }
 
     /**
+     * @return list<string>
+     */
+    public function translatableAttributes(): array
+    {
+        return ['name', 'slug', 'description'];
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
             'published_at' => 'datetime',
+            'name' => 'array',
+            'slug' => 'array',
+            'description' => 'array',
         ];
     }
 }

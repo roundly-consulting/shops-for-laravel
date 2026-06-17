@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Shops\Cart\Cart;
+use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Orders\Actions\PlaceOrderAction;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
@@ -11,7 +12,6 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
 use RoundlyConsulting\Shops\Orders\Order;
-use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 
