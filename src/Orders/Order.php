@@ -16,14 +16,21 @@ use RoundlyConsulting\Shops\Orders\Concerns\HasCoupon;
 use RoundlyConsulting\Shops\Orders\Concerns\HasItems;
 use RoundlyConsulting\Shops\Orders\Concerns\HasNumber;
 use RoundlyConsulting\Shops\Orders\Concerns\HasPrice;
+use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
+use RoundlyConsulting\Shops\Support\Casts\AddressCast;
 
 /**
  * @property int $id
  * @property string $number
  * @property Status $status
+ * @property int|null $coupon_id
+ * @property int|null $shop_id
+ * @property string|null $shop_type
  * @property string|null $note
+ * @property Address|null $billing_address
+ * @property Address|null $shipping_address
  * @property CarbonInterface|null $in_progress_at
  * @property CarbonInterface|null $paid_at
  * @property CarbonInterface|null $fulfilled_at
@@ -59,6 +66,8 @@ final class Order extends Model
     {
         return [
             'status' => Status::class,
+            'billing_address' => AddressCast::class,
+            'shipping_address' => AddressCast::class,
             'in_progress_at' => 'datetime',
             'paid_at' => 'datetime',
             'fulfilled_at' => 'datetime',

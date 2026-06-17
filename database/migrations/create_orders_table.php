@@ -18,22 +18,8 @@ return new class extends Migration
             $table->string('number');
             $table->string('status')->default(Status::New->value);
 
-            $table->string('billing_company_id')->nullable();
-            $table->string('billing_name')->nullable();
-            $table->string('billing_city')->nullable();
-            $table->string('billing_street')->nullable();
-            $table->string('billing_postal_code')->nullable();
-            $table->string('billing_country_iso')->nullable();
-
-            $table->string('shipping_company_id')->nullable();
-            $table->string('shipping_name')->nullable();
-            $table->string('shipping_city')->nullable();
-            $table->string('shipping_street')->nullable();
-            $table->string('shipping_postal_code')->nullable();
-            $table->string('shipping_country_iso')->nullable();
-
-            $table->string('phone')->nullable();
-            $table->string('email')->nullable();
+            $table->json('billing_address')->nullable();
+            $table->json('shipping_address')->nullable();
 
             $table->string('payment')->nullable();
             $table->string('shipping')->nullable();

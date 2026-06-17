@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('coupons', function (Blueprint $table): void {
             $table->id();
+            $table->string('code')->nullable();
             $table->integer('value');
             $table->integer('usage')->default(0);
             $table->integer('max_usage')->default(1);

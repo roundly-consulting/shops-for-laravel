@@ -158,6 +158,42 @@ throws an `InvalidCurrencyException`.
 
 ### Orders and pricing
 
+### Cart & placing an order
+
+A `Cart` is a persistent basket with an optional polymorphic `owner` (a user) or a guest
+`token` for anonymous checkout, plus a configured currency. Add variants to it and read its
+price through the same engine orders use:
+
+```php
+use RoundlyConsulting\Shops\Cart\Cart;
+
+$cart = Cart::create(['currency' => 'EUR']);
+$cart->add($variant, quantity: 2);   // snapshots name/sku/price; same variant increments
+
+$cart->subtotal();   // Money
+$cart->price();      // Price DTO (pass a coupon to discount it)
+```
+
+`PlaceOrderAction` turns a cart into an order in one transaction — snapshotting each line,
+reserving stock, linking a coupon by code, storing the billing/shipping address, generating the
+number, firing `OrderPlaced`, and clearing the cart. An oversell rolls everything back and
+leaves the cart untouched:
+
+```php
+use RoundlyConsulting\Shops\Orders\Actions\PlaceOrderAction;
+use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
+use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
+
+$order = app(PlaceOrderAction::class)->execute($cart, new PlaceOrderData(
+    billing: new Address('Ada Lovelace', '1 Analytical Way', 'London', 'EC1', 'GB'),
+    couponCode: 'WELCOME10',
+));
+```
+
+Billing and shipping addresses are stored as JSON and cast to an immutable `Address` DTO.
+
+### Orders and pricing
+
 An order has many `items`, an optional `coupon`, and an automatically generated `number`. Its
 `price` accessor returns a `Price` DTO that computes discount, shipping, tax, and the final
 total from the order's items.
