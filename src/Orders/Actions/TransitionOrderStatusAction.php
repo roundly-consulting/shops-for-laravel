@@ -20,6 +20,10 @@ use RoundlyConsulting\Shops\Orders\Order;
  */
 final class TransitionOrderStatusAction
 {
+    public function __construct(
+        private readonly ReleaseStockAction $releaseStock,
+    ) {}
+
     public function execute(Order $order, Status $to): Order
     {
         $from = $order->status;
@@ -38,11 +42,26 @@ final class TransitionOrderStatusAction
 
         $order->save();
 
+        $this->settleStock($order, $to);
+
         OrderStatusChanged::dispatch($order, $from, $to);
 
         $this->dispatchSpecificEvent($order, $to);
 
         return $order;
+    }
+
+    /**
+     * Canceling releases held stock back to availability; fulfilling converts
+     * the reservation into a real sale (decrementing on-hand stock).
+     */
+    private function settleStock(Order $order, Status $to): void
+    {
+        match ($to) {
+            Status::Canceled => $this->releaseStock->execute($order, sell: false),
+            Status::Fulfilled => $this->releaseStock->execute($order, sell: true),
+            default => null,
+        };
     }
 
     private function dispatchSpecificEvent(Order $order, Status $to): void

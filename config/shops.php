@@ -55,6 +55,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Inventory
+    |--------------------------------------------------------------------------
+    |
+    | "low_stock_threshold" is the available-stock level at or below which a
+    | tracked variant fires the StockRanLow event after an adjustment, so the
+    | host can reorder or hide the product.
+    |
+    */
+
+    'inventory' => [
+        'low_stock_threshold' => env('SHOPS_LOW_STOCK_THRESHOLD', 0),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Locales
     |--------------------------------------------------------------------------
     |

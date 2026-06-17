@@ -114,6 +114,29 @@ $variant->optionValues()->attach([$small->id]);
 $product->variantFor([$small->id]); // ?ProductVariant
 ```
 
+### Inventory & stock
+
+Stock is an auditable ledger: every change is a `StockAdjustment` row, and the variant caches
+`stock` (on hand) and `reserved` (held for pending orders). All writes go through
+`AdjustStockAction`, which row-locks the variant inside a transaction to avoid oversell:
+
+```php
+use RoundlyConsulting\Shops\Inventory\Actions\AdjustStockAction;
+use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
+
+app(AdjustStockAction::class)->execute($variant, 100, StockReason::Received);   // +100 on hand
+app(AdjustStockAction::class)->execute($variant, -1, StockReason::Sold, $order); // sell one
+```
+
+Selling below available stock on a `track_stock` variant throws `InsufficientStockException`;
+variants with `track_stock = false` (digital/unlimited goods) never throw. Every adjustment
+fires `StockAdjusted`, and crossing `shops.inventory.low_stock_threshold` fires `StockRanLow`.
+
+Orders manage reservations automatically: `ReserveStockAction` holds each line's quantity when
+an order is placed, canceling an order **releases** the hold, and fulfilling an order
+**converts** the reservation into a sale (decrementing on-hand stock). An oversell during
+reservation rolls back the whole order and holds nothing.
+
 ### Money value object
 
 `Money` is an immutable value object storing an integer amount in the currency's minor unit.
