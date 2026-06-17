@@ -1,9 +1,10 @@
 # Shops for Laravel
 
-Manage single or multiple shops with products, categories, and orders in Laravel. The
-package ships Eloquent models for products, categories, orders, and order items, a native
-money value object, automatic slugs and order numbers, and an optional, pluggable coupon
-discount calculation — with **no third-party runtime dependencies** beyond Laravel itself.
+A production-grade e-commerce foundation for Laravel: products with variants, SKUs and
+options, a race-safe inventory ledger with stock reservations, a guarded order state machine,
+a persistent cart with one-call order placement, correct net/gross tax pricing, native
+per-locale translations, a reference coupon/discount engine, and payment & shipping **driver
+contracts** — all with **no third-party runtime dependencies** beyond Laravel itself.
 
 ## Requirements
 
@@ -56,6 +57,31 @@ return [
 | `orders.coupon_model` | `class-string\|null` | `null` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation. Must implement the `Coupon` contract. Leave `null` if you do not use coupons. |
 
 ## Usage
+
+### Shop facade
+
+The optional `Shop` facade is a discoverable entry point fronting the package's actions. The
+underlying `ShopManager` is also resolvable for dependency injection:
+
+```php
+use RoundlyConsulting\Shops\Facades\Shop;
+
+$order = Shop::placeOrder($cart, $placeOrderData);
+$order = Shop::transition($order, Status::Paid);
+$result = Shop::charge($order);
+$discounted = Shop::useCoupon($coupon, Money::EUR(1000));
+```
+
+### Query scopes & route binding
+
+```php
+Product::query()->published();          // published_at set and not in the future
+Product::query()->unpublished();
+Product::query()->forShop($shop);       // filter by the polymorphic shop
+ProductVariant::query()->inStock(2);    // variants with >= 2 available (or untracked)
+```
+
+Orders are route-bound by their `number`; products and categories by their `slug`.
 
 ### Products and categories
 

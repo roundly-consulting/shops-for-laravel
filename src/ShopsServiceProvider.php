@@ -39,6 +39,8 @@ final class ShopsServiceProvider extends ServiceProvider
         $shipping = config('shops.shipping.method', FreeShippingMethod::class);
 
         $this->app->bind(ShippingMethod::class, $shipping);
+
+        $this->app->singleton(ShopManager::class);
     }
 
     public function boot(): void

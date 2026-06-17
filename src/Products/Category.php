@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
+use RoundlyConsulting\Shops\Concerns\HasPublishing;
 use RoundlyConsulting\Shops\Concerns\HasSlug;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
@@ -25,6 +26,7 @@ final class Category extends Model implements Translatable
     use BelongsToShop;
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
+    use HasPublishing;
     use HasSlug;
     use HasTranslations;
     use SoftDeletes;

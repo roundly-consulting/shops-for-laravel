@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
+use RoundlyConsulting\Shops\Concerns\HasPublishing;
 use RoundlyConsulting\Shops\Concerns\HasSlug;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
@@ -36,6 +37,7 @@ final class Product extends Model implements Translatable
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
     use HasOptions;
+    use HasPublishing;
     use HasSlug;
     use HasTranslations;
     use HasVariants;

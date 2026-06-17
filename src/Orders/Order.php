@@ -76,6 +76,11 @@ final class Order extends Model
         ];
     }
 
+    public function getRouteKeyName(): string
+    {
+        return 'number';
+    }
+
     public function transitionTo(Status $status): self
     {
         return resolve(TransitionOrderStatusAction::class)->execute($this, $status);
