@@ -17,14 +17,9 @@ final class OrderFactory extends Factory
 
     public function definition(): array
     {
-        $status = fake()->randomElement(Status::cases());
-
         return [
-            'status' => $status,
+            'status' => Status::New,
             'note' => fake()->sentence(),
-            'in_progress_at' => $status->isIn([Status::InProgress, Status::Completed]) ? fake()->dateTime() : null,
-            'completed_at' => $status->is(Status::Completed) ? fake()->dateTime() : null,
-            'canceled_at' => $status->is(Status::Canceled) ? fake()->dateTime() : null,
         ];
     }
 
@@ -32,6 +27,37 @@ final class OrderFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'status' => $status,
+        ]);
+    }
+
+    public function inProgress(): static
+    {
+        return $this->withStatus(Status::InProgress)->state(fn (): array => [
+            'in_progress_at' => now(),
+        ]);
+    }
+
+    public function paid(): static
+    {
+        return $this->withStatus(Status::Paid)->state(fn (): array => [
+            'in_progress_at' => now(),
+            'paid_at' => now(),
+        ]);
+    }
+
+    public function fulfilled(): static
+    {
+        return $this->withStatus(Status::Fulfilled)->state(fn (): array => [
+            'in_progress_at' => now(),
+            'paid_at' => now(),
+            'fulfilled_at' => now(),
+        ]);
+    }
+
+    public function canceled(): static
+    {
+        return $this->withStatus(Status::Canceled)->state(fn (): array => [
+            'canceled_at' => now(),
         ]);
     }
 }

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Database\Factories\OrderFactory;
+use RoundlyConsulting\Shops\Orders\Actions\TransitionOrderStatusAction;
 use RoundlyConsulting\Shops\Orders\Concerns\HasCoupon;
 use RoundlyConsulting\Shops\Orders\Concerns\HasItems;
 use RoundlyConsulting\Shops\Orders\Concerns\HasNumber;
@@ -24,8 +25,10 @@ use RoundlyConsulting\Shops\Orders\Enums\Status;
  * @property Status $status
  * @property string|null $note
  * @property CarbonInterface|null $in_progress_at
- * @property CarbonInterface|null $completed_at
+ * @property CarbonInterface|null $paid_at
+ * @property CarbonInterface|null $fulfilled_at
  * @property CarbonInterface|null $canceled_at
+ * @property CarbonInterface|null $refunded_at
  * @property-read Price $price
  * @property-read Collection<int, Item> $items
  */
@@ -57,8 +60,40 @@ final class Order extends Model
         return [
             'status' => Status::class,
             'in_progress_at' => 'datetime',
-            'completed_at' => 'datetime',
+            'paid_at' => 'datetime',
+            'fulfilled_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'refunded_at' => 'datetime',
         ];
+    }
+
+    public function transitionTo(Status $status): self
+    {
+        return resolve(TransitionOrderStatusAction::class)->execute($this, $status);
+    }
+
+    public function markInProgress(): self
+    {
+        return $this->transitionTo(Status::InProgress);
+    }
+
+    public function markPaid(): self
+    {
+        return $this->transitionTo(Status::Paid);
+    }
+
+    public function markFulfilled(): self
+    {
+        return $this->transitionTo(Status::Fulfilled);
+    }
+
+    public function cancel(): self
+    {
+        return $this->transitionTo(Status::Canceled);
+    }
+
+    public function refund(): self
+    {
+        return $this->transitionTo(Status::Refunded);
     }
 }

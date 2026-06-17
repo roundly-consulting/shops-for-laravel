@@ -38,8 +38,10 @@ return new class extends Migration
             $table->string('payment')->nullable();
             $table->string('shipping')->nullable();
             $table->timestamp('in_progress_at')->nullable();
-            $table->timestamp('completed_at')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('fulfilled_at')->nullable();
             $table->timestamp('canceled_at')->nullable();
+            $table->timestamp('refunded_at')->nullable();
             $table->text('note')->nullable();
             $table->timestamps();
             $table->softDeletes();

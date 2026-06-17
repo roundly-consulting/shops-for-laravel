@@ -124,21 +124,61 @@ Item::create([
 
 $price = $order->price;                  // RoundlyConsulting\Shops\Orders\DataTransferObjects\Price
 
-$price->price;                  // sum of item prices
+$price->getSubtotal();           // sum of line totals (quantity-aware), before discount
 $price->getPriceAfterDiscount(); // after the coupon (if any)
-$price->getTaxPrice();           // tax on (discounted price + shipping)
-$price->getFinalPrice();         // discounted price + shipping + tax
+$price->getNetPrice();           // tax-exclusive value of the goods
+$price->getTaxPrice();           // tax across the goods (after discount)
 $price->getDiscountValue();      // amount saved by the coupon
+$price->getFinalPrice();         // amount the customer pays (goods + shipping, tax-correct)
 ```
 
-### Order status
+Pricing is **quantity-aware** (a 2× line is billed twice) and **tax-correct** for both
+tax-inclusive and tax-exclusive catalogs. Set `shops.pricing.price_type` to `gross`
+(default — tax is *extracted* from the price) or `net` (tax is *added on top*). Tax rates
+are resolved per line by tax class via the `tax_classes` config map; host applications can
+supply jurisdiction logic by binding their own `TaxResolver` implementation.
+
+### Order status & lifecycle
+
+Orders move through a guarded state machine. The statuses are `New`, `InProgress`, `Paid`,
+`Fulfilled`, `Canceled`, and `Refunded`, with these allowed transitions:
+
+```
+New        → InProgress | Canceled
+InProgress → Paid | Canceled
+Paid       → Fulfilled | Refunded
+Fulfilled  → Refunded
+Canceled, Refunded   (terminal)
+```
+
+Transition with the helper methods on the order; each one validates the move, stamps the
+matching timestamp column (`in_progress_at`, `paid_at`, `fulfilled_at`, `canceled_at`,
+`refunded_at`), persists, and fires events:
 
 ```php
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 
-$order->status->is(Status::Completed);                       // bool
-$order->status->isIn([Status::InProgress, Status::Completed]); // bool
+$order->markInProgress();   // New → InProgress
+$order->markPaid();         // InProgress → Paid, stamps paid_at, fires OrderPaid
+$order->markFulfilled();    // Paid → Fulfilled, fires OrderFulfilled
+$order->cancel();           // → Canceled, fires OrderCanceled
+$order->refund();           // Paid|Fulfilled → Refunded, fires OrderRefunded
+
+// Or transition explicitly:
+$order->transitionTo(Status::Paid);
+
+// Reads:
+$order->status->is(Status::Paid);                       // bool
+$order->status->isIn([Status::Paid, Status::Fulfilled]); // bool
+$order->status->canTransitionTo(Status::Refunded);       // bool
+$order->status->isTerminal();                            // bool
 ```
+
+An illegal transition (e.g. refunding a `New` order) throws
+`RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException` and changes
+nothing. Every transition fires `OrderStatusChanged` (carrying `from`/`to`) plus a
+status-specific event (`OrderPaid`, `OrderFulfilled`, `OrderCanceled`, `OrderRefunded`)
+your application can listen to.
 
 ### Order numbers
 

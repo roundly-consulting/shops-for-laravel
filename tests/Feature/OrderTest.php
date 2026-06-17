@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
+use RoundlyConsulting\Shops\Orders\Enums\Status;
+use RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Support\Money\Money;
@@ -49,6 +51,40 @@ it('applies a coupon discount to the order price', function (): void {
     Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
 
     expect($order->refresh()->price->getPriceAfterDiscount()->getAmount())->toBe('900');
+});
+
+it('moves through its lifecycle via helper methods', function (): void {
+    $order = Order::factory()->create();
+
+    expect($order->markInProgress())->status->toBe(Status::InProgress)
+        ->and($order->markPaid())->status->toBe(Status::Paid)
+        ->and($order->markFulfilled())->status->toBe(Status::Fulfilled);
+
+    expect($order->refresh())
+        ->in_progress_at->not->toBeNull()
+        ->paid_at->not->toBeNull()
+        ->fulfilled_at->not->toBeNull();
+});
+
+it('cancels an order via the helper', function (): void {
+    $order = Order::factory()->create();
+
+    expect($order->cancel())->status->toBe(Status::Canceled)
+        ->and($order->refresh()->canceled_at)->not->toBeNull();
+});
+
+it('refunds a paid order via the helper', function (): void {
+    $order = Order::factory()->paid()->create();
+
+    expect($order->refund())->status->toBe(Status::Refunded)
+        ->and($order->refresh()->refunded_at)->not->toBeNull();
+});
+
+it('rejects an illegal transition through a helper', function (): void {
+    $order = Order::factory()->create();
+
+    expect(fn () => $order->refund())
+        ->toThrow(IllegalStatusTransitionException::class);
 });
 
 it('generates an order number from the current year and order count', function (): void {
