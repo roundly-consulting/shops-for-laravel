@@ -11,9 +11,9 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
 use RoundlyConsulting\Shops\Orders\Order;
+use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Tests\Fixtures\TestCoupon;
 
 beforeEach(function (): void {
     config()->set('shops.pricing.default_currency', 'EUR');
@@ -21,7 +21,7 @@ beforeEach(function (): void {
 
 it('links a coupon by code and copies the cart shop', function (): void {
     $shop = Category::factory()->create();
-    $coupon = TestCoupon::factory()->create(['code' => 'WELCOME10', 'value' => 10]);
+    $coupon = Coupon::factory()->percentage(10)->create(['code' => 'WELCOME10']);
 
     $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 10]);
     $cart = Cart::factory()->create(['coupon_code' => 'WELCOME10']);

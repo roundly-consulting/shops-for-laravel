@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
 use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
 
@@ -125,7 +126,7 @@ return [
     */
 
     'discounts' => [
-        'coupon_model' => env('SHOPS_COUPON_MODEL'),
+        'coupon_model' => env('SHOPS_COUPON_MODEL', Coupon::class),
     ],
 
     'orders' => [

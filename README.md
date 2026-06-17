@@ -290,38 +290,38 @@ final class UuidNumberGenerator implements NumberGenerator
 }
 ```
 
-### Coupons
+### Coupons & discounts
 
-Coupons live in your own application (or another package). To enable discounts, implement the
-`Coupon` contract on your coupon model and register it via `shops.orders.coupon_model`:
+The package ships a usable reference `Coupon` model (`RoundlyConsulting\Shops\Discounts\Coupon`)
+implementing the `Coupon` contract: percentage or fixed-amount discounts guarded by usage
+limit, active window, and minimum spend. Point `shops.discounts.coupon_model` at it (or your
+own model) to enable discounts:
 
 ```php
-use RoundlyConsulting\Shops\Contracts\Coupon;
+use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
-final class AppCoupon extends \Illuminate\Database\Eloquent\Model implements Coupon
-{
-    public function canBeApplied(): bool
-    {
-        return $this->usage < $this->max_usage;
-    }
+$coupon = Coupon::create([
+    'code' => 'WELCOME10',
+    'type' => 'percentage',   // or 'fixed'
+    'value' => 10,            // 10% (percentage) or 10 minor units (fixed)
+    'max_usage' => 100,
+    'minimum_spend' => 5000,  // optional; requires a currency for fixed/min-spend
+    'currency' => 'EUR',
+    'expires_at' => now()->addMonth(),
+]);
 
-    public function apply(Money $money): Money
-    {
-        return $money->subtract($money->multiply($this->value)->divide(100));
-    }
-
-    public function recordUsage(): void
-    {
-        $this->increment('usage');
-    }
-}
+$coupon->canBeApplied(Money::EUR(6000)); // checks window, usage and min-spend
+$coupon->apply(Money::EUR(1000));        // 900 EUR (percentage)
 ```
 
-Apply a coupon (and record its usage transactionally) with the `UseCoupon` action:
+To swap in your own model, implement the `RoundlyConsulting\Shops\Contracts\Coupon` contract
+(`canBeApplied()`, `apply(Money)`, `recordUsage()`) and register it via the config.
+
+Apply a coupon and record its usage transactionally with the `UseCoupon` action:
 
 ```php
-use RoundlyConsulting\Shops\Products\Actions\UseCoupon;
+use RoundlyConsulting\Shops\Orders\Actions\UseCoupon;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
 $discounted = app(UseCoupon::class)->execute($coupon, Money::EUR(1000));

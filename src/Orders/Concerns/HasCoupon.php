@@ -18,7 +18,7 @@ trait HasCoupon
     public function coupon(): BelongsTo
     {
         /** @var class-string<Model> $model */
-        $model = config('shops.orders.coupon_model');
+        $model = config('shops.orders.coupon_model') ?? config('shops.discounts.coupon_model');
 
         return $this->belongsTo($model);
     }

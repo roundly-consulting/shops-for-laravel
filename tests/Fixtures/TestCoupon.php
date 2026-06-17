@@ -23,7 +23,7 @@ final class TestCoupon extends Model implements Coupon
     /** @use HasFactory<TestCouponFactory> */
     use HasFactory;
 
-    protected $table = 'coupons';
+    protected $table = 'test_coupons';
 
     protected $guarded = [];
 

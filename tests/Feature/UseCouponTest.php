@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use RoundlyConsulting\Shops\Products\Actions\UseCoupon;
+use RoundlyConsulting\Shops\Orders\Actions\UseCoupon;
 use RoundlyConsulting\Shops\Support\Money\Money;
 use RoundlyConsulting\Shops\Tests\Fixtures\TestCoupon;
 
