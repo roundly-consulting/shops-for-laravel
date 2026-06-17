@@ -1,0 +1,17 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "declare_strict_types": true,
+        "final_class": false,
+        "ordered_imports": {
+            "sort_algorithm": "alpha"
+        },
+        "class_attributes_separation": {
+            "elements": {
+                "const": "one",
+                "method": "one",
+                "property": "one"
+            }
+        }
+    }
+}

@@ -1,0 +1,9 @@
+parameters:
+    level: 7
+    paths:
+        - src
+        - database
+        - config
+    checkModelProperties: true
+    configDirectories:
+        - config
