@@ -7,8 +7,8 @@ namespace RoundlyConsulting\Shops\Orders\DataTransferObjects;
 use RoundlyConsulting\Shops\Contracts\Coupon;
 use RoundlyConsulting\Shops\Contracts\TaxResolver;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
+use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\Support\Money\Money;
-use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
 
 /**
  * Quantity-aware, precision-correct price calculation for a set of lines.
@@ -33,8 +33,10 @@ final readonly class Price
         ?TaxResolver $taxResolver = null,
         public ?Coupon $coupon = null,
         private string $currency = 'EUR',
+        private ?Shop $shop = null,
+        private ?string $country = null,
     ) {
-        $this->taxResolver = $taxResolver ?? new ConfigTaxResolver;
+        $this->taxResolver = $taxResolver ?? app(TaxResolver::class);
     }
 
     /**
@@ -146,22 +148,22 @@ final readonly class Price
 
     private function taxForLine(PriceLine $line): Money
     {
-        $rate = $this->taxResolver->rateFor($line->taxClass);
+        $rate = $this->taxResolver->rateFor($this->shop, $line->taxClass, $this->country);
         $lineTotal = $line->lineTotal();
 
-        if ($rate === 0) {
+        if ($rate->isZero()) {
             return Money::zero($lineTotal->getCurrency()->getCode());
         }
 
         if ($this->priceType === PriceType::Gross) {
             // Extract the tax already baked into a gross price:
-            // net = gross / (1 + rate/100); tax = gross - net.
-            $net = $lineTotal->divide(1 + ($rate / 100));
+            // net = gross / (1 + rate); tax = gross - net.
+            $net = $lineTotal->divide($rate->grossDivisor());
 
             return $lineTotal->subtract($net);
         }
 
         // Net price: add the tax on top.
-        return $lineTotal->multiply($rate)->divide(100);
+        return $lineTotal->multiply($rate->basisPoints)->divide(10000);
     }
 }
