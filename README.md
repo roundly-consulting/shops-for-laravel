@@ -37,11 +37,28 @@ prefer to keep them inside the package.
 
 ## Configuration
 
-The published `config/shops.php` contains:
+The published `config/shops.php` documents every key. The most relevant ones:
 
 ```php
 return [
-    'tax_rate' => (int) env('SHOPS_TAX_RATE', 20),
+    // The tenant model every shop-owned record belongs to via "shop_id".
+    'shop_model' => env('SHOPS_SHOP_MODEL', \RoundlyConsulting\Shops\Shops\Shop::class),
+
+    'pricing' => [
+        'price_type' => env('SHOPS_PRICE_TYPE', 'gross'),
+        'default_currency' => env('SHOPS_DEFAULT_CURRENCY', 'EUR'),
+    ],
+
+    // Fallback floor (whole percents) used when a shop has no database rate.
+    'tax_classes' => [
+        'standard' => env('SHOPS_TAX_RATE', 20),
+        'reduced' => 10,
+        'zero' => 0,
+    ],
+
+    'tax' => [
+        'resolver' => \RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver::class,
+    ],
 
     'orders' => [
         'number_generator' => DefaultNumberGenerator::class,
@@ -52,7 +69,11 @@ return [
 
 | Key | Type | Default | Env | Description |
 |---|---|---|---|---|
-| `tax_rate` | `int` | `20` | `SHOPS_TAX_RATE` | Whole-number percentage tax applied to an order's price after discount and shipping. |
+| `shop_model` | `class-string` | `Shops\Shop::class` | `SHOPS_SHOP_MODEL` | The Eloquent tenant model every owned record points at via its `shop_id` foreign key. Swap in your own model to extend it. |
+| `pricing.price_type` | `string` | `gross` | `SHOPS_PRICE_TYPE` | `gross` (tax is extracted from the stored price) or `net` (tax is added on top). |
+| `pricing.default_currency` | `string` | `EUR` | `SHOPS_DEFAULT_CURRENCY` | ISO-4217 currency every cart and order uses. |
+| `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. |
+| `tax.resolver` | `class-string` | `DatabaseTaxResolver::class` | — | Resolves the rate for a `(shop, class, country)` lookup. Defaults to per-shop database rates with the config map as the floor. Bind `ConfigTaxResolver` to use only the config map, or your own `TaxResolver`. |
 | `orders.number_generator` | `class-string` | `DefaultNumberGenerator::class` | — | The class used to generate an order number. Must implement `NumberGenerator`. |
 | `orders.coupon_model` | `class-string\|null` | `null` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation. Must implement the `Coupon` contract. Leave `null` if you do not use coupons. |
 
@@ -77,15 +98,83 @@ $discounted = Shop::useCoupon($coupon, Money::EUR(1000));
 ```php
 Product::query()->published();          // published_at set and not in the future
 Product::query()->unpublished();
-Product::query()->forShop($shop);       // filter by the polymorphic shop
+Product::query()->forShop($shop);       // filter by a Shop model or a raw shop id
 ProductVariant::query()->inStock(2);    // variants with >= 2 available (or untracked)
 ```
 
-Orders are route-bound by their `number`; products and categories by their `slug`.
+Orders are route-bound by their `number`; products, categories and shops by their `slug`.
+
+### Shops (tenancy)
+
+A `Shop` is the concrete tenant every owned record belongs to through a plain `shop_id`
+foreign key. A single-shop app can ignore it entirely (the column is nullable); a multi-shop
+app creates shops and scopes data to them.
+
+```php
+use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\Shops\CurrentShop;
+
+$shop = Shop::create(['name' => 'Acme EU', 'currency' => 'EUR']);
+$shop->currency();   // 'EUR' — the per-shop override, or the configured default when null
+
+// Explicit ownership always wins:
+$product = Product::create(['shop_id' => $shop->id, 'name' => 'Sparkling Water']);
+
+// Or bind a current shop and let ownership auto-fill on create:
+app(CurrentShop::class)->set($shop);
+Product::create(['name' => 'Still Water']);          // shop_id auto-filled
+app(CurrentShop::class)->forget();
+
+// Scoped block — restores the previous binding afterwards (even on exception):
+app(CurrentShop::class)->run($shop, function () {
+    Product::create(['name' => 'Tonic']);            // belongs to $shop
+});
+
+Shop::current();                         // ?Shop bound to the current context
+
+Product::query()->forShop($shop)->get();       // scope by model
+Product::query()->forShop($shop->id)->get();   // or by id
+```
+
+Swap the tenant model by pointing `shops.shop_model` at your own class.
+
+### Per-shop tax rates
+
+Each shop owns many `TaxRate` rows. A rate carries a tax class, an optional ISO-3166-1
+alpha-2 country, and a rate in **integer basis points** (1 bp = 0.01%, so `1900` = 19.00%,
+`850` = 8.5%). The default `DatabaseTaxResolver` resolves a `(shop, class, country)` lookup
+through a fallback chain: an exact country match, then the shop's class default, then the
+highest-priority class rate, then the `tax_classes` config floor, then zero.
+
+```php
+use RoundlyConsulting\Shops\Shops\TaxRate;
+use RoundlyConsulting\Shops\Contracts\TaxResolver;
+
+$shop->taxRates()->create([
+    'name' => 'Germany Standard', 'tax_class' => 'standard',
+    'country' => 'DE', 'rate' => 1900, 'is_default' => true,   // 19.00%
+]);
+$shop->taxRates()->create([
+    'name' => 'Luxembourg Reduced', 'tax_class' => 'reduced',
+    'country' => 'LU', 'rate' => 850,                          // 8.50%
+]);
+
+$value = app(TaxResolver::class)->rateFor($shop, 'reduced', 'LU');
+$value->percent();        // 8.5
+$value->basisPoints;      // 850
+$value->grossDivisor();   // 1.085
+$value->isZero();         // false
+
+app(TaxResolver::class)->rateFor($shop, 'standard');   // shop's default standard rate
+app(TaxResolver::class)->rateFor(null, 'standard');    // config floor (2000 bp = 20%)
+```
+
+Order and cart pricing automatically use the owning shop's rate (and, when an order has a
+shipping address, its country), so tax differs correctly per shop.
 
 ### Products and categories
 
-Products and categories belong to an optional polymorphic `shop` (so the same tables serve a
+Products and categories belong to an optional `shop` tenant (so the same tables serve a
 single shop or many), generate a URL slug from their `name`, and use the slug as the route
 key.
 
@@ -270,8 +359,9 @@ $price->getFinalPrice();         // amount the customer pays (goods + shipping, 
 Pricing is **quantity-aware** (a 2× line is billed twice) and **tax-correct** for both
 tax-inclusive and tax-exclusive catalogs. Set `shops.pricing.price_type` to `gross`
 (default — tax is *extracted* from the price) or `net` (tax is *added on top*). Tax rates
-are resolved per line by tax class via the `tax_classes` config map; host applications can
-supply jurisdiction logic by binding their own `TaxResolver` implementation.
+are resolved per line by the owning shop's database rates (with country awareness), falling
+back to the `tax_classes` config map; host applications can supply their own jurisdiction
+logic by binding a custom `TaxResolver`.
 
 ### Order status & lifecycle
 

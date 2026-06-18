@@ -2,27 +2,32 @@
 
 declare(strict_types=1);
 
-use RoundlyConsulting\Shops\Contracts\TaxResolver;
 use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
+use RoundlyConsulting\Shops\Support\Tax\TaxRateValue;
 
-it('returns the configured rate for each tax class', function (): void {
+it('returns a basis-point value for each configured tax class', function (): void {
     $resolver = new ConfigTaxResolver;
 
-    expect($resolver->rateFor('standard'))->toBe(20)
-        ->and($resolver->rateFor('reduced'))->toBe(10)
-        ->and($resolver->rateFor('zero'))->toBe(0);
+    expect($resolver->rateFor(null, 'standard'))
+        ->toBeInstanceOf(TaxRateValue::class)
+        ->and($resolver->rateFor(null, 'standard')->basisPoints)->toBe(2000)
+        ->and($resolver->rateFor(null, 'reduced')->basisPoints)->toBe(1000)
+        ->and($resolver->rateFor(null, 'zero')->basisPoints)->toBe(0);
 });
 
 it('falls back to the standard class for an unknown tax class', function (): void {
-    expect((new ConfigTaxResolver)->rateFor('made-up'))->toBe(20);
+    expect((new ConfigTaxResolver)->rateFor(null, 'made-up')->basisPoints)->toBe(2000);
 });
 
 it('falls back to zero when even the standard class is missing', function (): void {
     config()->set('shops.tax_classes', []);
 
-    expect((new ConfigTaxResolver)->rateFor('anything'))->toBe(0);
+    expect((new ConfigTaxResolver)->rateFor(null, 'anything')->isZero())->toBeTrue();
 });
 
-it('is bound as the default tax resolver', function (): void {
-    expect(resolve(TaxResolver::class))->toBeInstanceOf(ConfigTaxResolver::class);
+it('carries the requested tax class and country on the value', function (): void {
+    $value = (new ConfigTaxResolver)->rateFor(null, 'reduced', 'DE');
+
+    expect($value->taxClass)->toBe('reduced')
+        ->and($value->country)->toBe('DE');
 });

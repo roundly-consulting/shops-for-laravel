@@ -7,6 +7,7 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Support\Money\Money;
 use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
+use RoundlyConsulting\Shops\Tests\Fixtures\FixedRateResolver;
 use RoundlyConsulting\Shops\Tests\Fixtures\TestCoupon;
 
 it('multiplies the line price by its quantity (G4 regression)', function (): void {
@@ -125,3 +126,47 @@ it('defaults the price type to gross and uses the bound resolver', function (): 
     expect($price->priceType)->toBe(PriceType::Gross)
         ->and($price->getTaxPrice()->getAmount())->toBe('20');
 });
+
+it('extracts gross tax at fractional and whole basis-point rates', function (int $bp, string $gross, string $tax, string $net): void {
+    $price = new Price(
+        lines: [new PriceLine(Money::EUR((int) $gross), taxClass: 'standard')],
+        shipping: Money::zero('EUR'),
+        priceType: PriceType::Gross,
+        taxResolver: new FixedRateResolver($bp),
+    );
+
+    expect($price->getTaxPrice()->getAmount())->toBe($tax)
+        ->and($price->getNetPrice()->getAmount())->toBe($net);
+})->with([
+    '8.5% of 1085' => [850, '1085', '85', '1000'],
+    '19% of 1190' => [1900, '1190', '190', '1000'],
+    '21% of 1210' => [2100, '1210', '210', '1000'],
+]);
+
+it('adds net tax on top at fractional and whole basis-point rates', function (int $bp, string $net, string $tax): void {
+    $price = new Price(
+        lines: [new PriceLine(Money::EUR((int) $net), taxClass: 'standard')],
+        shipping: Money::zero('EUR'),
+        priceType: PriceType::Net,
+        taxResolver: new FixedRateResolver($bp),
+    );
+
+    expect($price->getTaxPrice()->getAmount())->toBe($tax);
+})->with([
+    '8.5% of 1000' => [850, '1000', '85'],
+    '19% of 1000' => [1900, '1000', '190'],
+]);
+
+it('yields zero tax for a zero rate on both price types', function (PriceType $type): void {
+    $price = new Price(
+        lines: [new PriceLine(Money::EUR(1000), taxClass: 'standard')],
+        shipping: Money::zero('EUR'),
+        priceType: $type,
+        taxResolver: new FixedRateResolver(0),
+    );
+
+    expect($price->getTaxPrice()->getAmount())->toBe('0');
+})->with([
+    'gross' => [PriceType::Gross],
+    'net' => [PriceType::Net],
+]);

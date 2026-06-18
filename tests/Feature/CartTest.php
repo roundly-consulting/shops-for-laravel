@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use RoundlyConsulting\Shops\Cart\Cart;
@@ -17,7 +18,7 @@ beforeEach(function (): void {
 it('has relationships', function (): void {
     expect((new Cart)->items())->toBeInstanceOf(HasMany::class)
         ->and((new Cart)->owner())->toBeInstanceOf(MorphTo::class)
-        ->and((new Cart)->shop())->toBeInstanceOf(MorphTo::class);
+        ->and((new Cart)->shop())->toBeInstanceOf(BelongsTo::class);
 });
 
 it('reports whether it is a guest cart', function (): void {

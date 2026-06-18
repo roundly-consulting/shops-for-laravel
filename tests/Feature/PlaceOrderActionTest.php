@@ -12,27 +12,25 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
 use RoundlyConsulting\Shops\Orders\Order;
-use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\ProductVariant;
+use RoundlyConsulting\Shops\Shops\Shop;
 
 beforeEach(function (): void {
     config()->set('shops.pricing.default_currency', 'EUR');
 });
 
 it('links a coupon by code and copies the cart shop', function (): void {
-    $shop = Category::factory()->create();
+    $shop = Shop::factory()->create();
     $coupon = Coupon::factory()->percentage(10)->create(['code' => 'WELCOME10']);
 
     $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 10]);
-    $cart = Cart::factory()->create(['coupon_code' => 'WELCOME10']);
-    $cart->shop()->associate($shop)->save();
+    $cart = Cart::factory()->create(['coupon_code' => 'WELCOME10', 'shop_id' => $shop->id]);
     $cart->add($variant, 1);
 
     $order = app(PlaceOrderAction::class)->execute($cart);
 
     expect($order->coupon_id)->toBe($coupon->id)
-        ->and($order->shop_id)->toBe($shop->id)
-        ->and($order->shop_type)->toBe($shop->getMorphClass());
+        ->and($order->shop_id)->toBe($shop->id);
 });
 
 it('skips coupon linking when no coupon model is configured', function (): void {

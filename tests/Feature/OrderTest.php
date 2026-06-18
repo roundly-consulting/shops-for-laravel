@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
@@ -18,7 +17,7 @@ it('has relationships', function (): void {
     $order = new Order;
 
     expect($order)
-        ->shop()->toBeInstanceOf(MorphTo::class)
+        ->shop()->toBeInstanceOf(BelongsTo::class)
         ->coupon()->toBeInstanceOf(BelongsTo::class)
         ->items()->toBeInstanceOf(HasMany::class);
 });

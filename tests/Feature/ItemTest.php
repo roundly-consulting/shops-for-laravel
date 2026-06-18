@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
@@ -11,7 +10,7 @@ it('has relationships', function (): void {
     $item = new Item;
 
     expect($item)
-        ->shop()->toBeInstanceOf(MorphTo::class)
+        ->shop()->toBeInstanceOf(BelongsTo::class)
         ->order()->toBeInstanceOf(BelongsTo::class);
 });
 

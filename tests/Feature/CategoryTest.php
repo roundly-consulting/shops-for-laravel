@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use RoundlyConsulting\Shops\Products\Category;
 
 it('has a shop relationship', function (): void {
-    expect((new Category)->shop())->toBeInstanceOf(MorphTo::class);
+    expect((new Category)->shop())->toBeInstanceOf(BelongsTo::class);
 });
 
 it('generates a slug from the name', function (): void {

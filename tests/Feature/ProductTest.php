@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\Product;
@@ -16,7 +16,7 @@ it('has relationships', function (): void {
     $product = new Product;
 
     expect($product)
-        ->shop()->toBeInstanceOf(MorphTo::class)
+        ->shop()->toBeInstanceOf(BelongsTo::class)
         ->categories()->toBeInstanceOf(BelongsToMany::class)
         ->variants()->toBeInstanceOf(HasMany::class)
         ->defaultVariant()->toBeInstanceOf(HasOne::class)
