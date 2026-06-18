@@ -12,7 +12,8 @@ use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\NumberGenerator;
 use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
 use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;
-use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
+use RoundlyConsulting\Shops\Shops\CurrentShop;
+use RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver;
 
 final class ShopsServiceProvider extends ServiceProvider
 {
@@ -20,13 +21,15 @@ final class ShopsServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/shops.php', 'shops');
 
+        $this->app->singleton(CurrentShop::class);
+
         /** @var class-string<NumberGenerator> $generator */
         $generator = config('shops.orders.number_generator', DefaultNumberGenerator::class);
 
         $this->app->bind(NumberGenerator::class, $generator);
 
         /** @var class-string<TaxResolver> $taxResolver */
-        $taxResolver = config('shops.tax.resolver', ConfigTaxResolver::class);
+        $taxResolver = config('shops.tax.resolver', DatabaseTaxResolver::class);
 
         $this->app->bind(TaxResolver::class, $taxResolver);
 

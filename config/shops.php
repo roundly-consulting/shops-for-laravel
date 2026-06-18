@@ -6,9 +6,23 @@ use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
 use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
 use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;
-use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
+use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver;
 
 return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shop (Tenant) Model
+    |--------------------------------------------------------------------------
+    |
+    | The Eloquent model that acts as the tenant every shop-owned record belongs
+    | to via its "shop_id" foreign key. The package ships a fully usable Shop
+    | model; point this at your own model to swap it.
+    |
+    */
+
+    'shop_model' => env('SHOPS_SHOP_MODEL', Shop::class),
 
     /*
     |--------------------------------------------------------------------------
@@ -36,13 +50,18 @@ return [
     |--------------------------------------------------------------------------
     |
     | "tax_classes" maps a tax class name to its whole-number rate, e.g.
-    | 'standard' => 20 means 20%. Every product variant carries a tax class
-    | (default "standard"). The legacy single "tax_rate" is folded into the
-    | "standard" class.
+    | 'standard' => 20 means 20%. This map is the fallback floor used when a shop
+    | has no matching database tax rate; the default DatabaseTaxResolver always
+    | prefers per-shop rates stored in the "tax_rates" table.
     |
-    | "resolver" is the class resolving a rate for a tax class. Bind your own
-    | implementation of RoundlyConsulting\Shops\Contracts\TaxResolver to add
-    | jurisdiction-aware logic; the default reads the map below.
+    | Database tax rates are stored in basis points (1900 = 19.00%), but this
+    | config map stays in whole percents for authoring convenience — the config
+    | fallback multiplies by 100 internally.
+    |
+    | "resolver" is the class resolving a rate for a (shop, class, country)
+    | tuple. The default DatabaseTaxResolver reads per-shop rates and falls back
+    | to this map. Bind ConfigTaxResolver to use only the config map, or your own
+    | implementation of RoundlyConsulting\Shops\Contracts\TaxResolver.
     |
     */
 
@@ -53,7 +72,7 @@ return [
     ],
 
     'tax' => [
-        'resolver' => ConfigTaxResolver::class,
+        'resolver' => DatabaseTaxResolver::class,
     ],
 
     /*
