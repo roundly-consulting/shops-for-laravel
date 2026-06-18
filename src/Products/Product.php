@@ -21,6 +21,7 @@ use RoundlyConsulting\Shops\Products\Concerns\HasVariants;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
+ * @property int|null $shop_id
  * @property string $name
  * @property string $slug
  * @property string|null $description

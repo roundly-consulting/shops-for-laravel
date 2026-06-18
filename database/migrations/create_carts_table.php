@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('carts', function (Blueprint $table): void {
             $table->id();
-            $table->nullableMorphs('shop');
+            $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->nullableMorphs('owner');
             $table->string('token')->nullable()->unique();
             $table->string('currency');

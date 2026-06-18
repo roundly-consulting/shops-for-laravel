@@ -23,6 +23,7 @@ use RoundlyConsulting\Shops\Support\Money\Money;
  * at it) or swap in their own model.
  *
  * @property int $id
+ * @property int|null $shop_id
  * @property string $code
  * @property DiscountType $type
  * @property int $value

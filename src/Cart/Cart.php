@@ -17,13 +17,13 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Products\ProductVariant;
+use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @property int $id
  * @property string|null $token
  * @property int|null $shop_id
- * @property string|null $shop_type
  * @property string $currency
  * @property string|null $coupon_code
  * @property-read Collection<int, CartItem> $items
@@ -99,6 +99,8 @@ final class Cart extends Model
             );
         }
 
+        $shop = $this->shop_id !== null && $this->shop instanceof Shop ? $this->shop : null;
+
         return new Price(
             lines: $lines,
             shipping: Money::zero($this->currency),
@@ -106,6 +108,7 @@ final class Cart extends Model
             taxResolver: null,
             coupon: $coupon,
             currency: $this->currency,
+            shop: $shop,
         );
     }
 }

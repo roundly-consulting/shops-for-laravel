@@ -39,9 +39,8 @@ final class PlaceOrderAction
 
             $this->linkCoupon($order, $data->couponCode ?? $cart->coupon_code);
 
-            if ($cart->shop_type !== null) {
+            if ($cart->shop_id !== null) {
                 $order->shop_id = $cart->shop_id;
-                $order->shop_type = $cart->shop_type;
             }
 
             $order->save();

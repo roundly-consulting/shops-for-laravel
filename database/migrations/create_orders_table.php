@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table): void {
             $table->id();
-            $table->nullableMorphs('shop');
+            $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->unsignedBigInteger('coupon_id')->nullable()->index();
             $table->string('number');
             $table->string('status')->default(Status::New->value);
@@ -32,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['number', 'shop_id', 'shop_type']);
+            $table->unique(['number', 'shop_id']);
         });
     }
 };

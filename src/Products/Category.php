@@ -16,6 +16,7 @@ use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\CategoryFactory;
 
 /**
+ * @property int|null $shop_id
  * @property string $name
  * @property string $slug
  * @property string|null $description

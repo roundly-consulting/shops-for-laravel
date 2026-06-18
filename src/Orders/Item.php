@@ -16,6 +16,7 @@ use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @property int $id
+ * @property int|null $shop_id
  * @property int $order_id
  * @property int|null $product_id
  * @property int|null $product_variant_id

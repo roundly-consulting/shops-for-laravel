@@ -27,7 +27,6 @@ use RoundlyConsulting\Shops\Support\Casts\AddressCast;
  * @property Status $status
  * @property int|null $coupon_id
  * @property int|null $shop_id
- * @property string|null $shop_type
  * @property string|null $note
  * @property Address|null $billing_address
  * @property Address|null $shipping_address
