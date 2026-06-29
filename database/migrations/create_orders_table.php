@@ -15,8 +15,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->unsignedBigInteger('coupon_id')->nullable()->index();
+            $table->nullableMorphs('customer');
             $table->string('number');
             $table->string('status')->default(Status::New->value);
+
+            // Store credit (minor units) applied to this order before the gateway charge.
+            $table->integer('store_credit_applied')->nullable();
 
             $table->json('billing_address')->nullable();
             $table->json('shipping_address')->nullable();

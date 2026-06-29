@@ -13,6 +13,7 @@ use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Database\Factories\OrderFactory;
 use RoundlyConsulting\Shops\Orders\Actions\TransitionOrderStatusAction;
 use RoundlyConsulting\Shops\Orders\Concerns\HasCoupon;
+use RoundlyConsulting\Shops\Orders\Concerns\HasCustomer;
 use RoundlyConsulting\Shops\Orders\Concerns\HasItems;
 use RoundlyConsulting\Shops\Orders\Concerns\HasNumber;
 use RoundlyConsulting\Shops\Orders\Concerns\HasPrice;
@@ -27,6 +28,9 @@ use RoundlyConsulting\Shops\Support\Casts\AddressCast;
  * @property Status $status
  * @property int|null $coupon_id
  * @property int|null $shop_id
+ * @property string|null $customer_type
+ * @property int|string|null $customer_id
+ * @property int|null $store_credit_applied
  * @property string|null $note
  * @property Address|null $billing_address
  * @property Address|null $shipping_address
@@ -37,11 +41,13 @@ use RoundlyConsulting\Shops\Support\Casts\AddressCast;
  * @property CarbonInterface|null $refunded_at
  * @property-read Price $price
  * @property-read Collection<int, Item> $items
+ * @property-read Model|null $customer
  */
 final class Order extends Model
 {
     use BelongsToShop;
     use HasCoupon;
+    use HasCustomer;
     /** @use HasFactory<OrderFactory> */
     use HasFactory;
     use HasItems;
@@ -72,6 +78,7 @@ final class Order extends Model
             'fulfilled_at' => 'datetime',
             'canceled_at' => 'datetime',
             'refunded_at' => 'datetime',
+            'store_credit_applied' => 'int',
         ];
     }
 
