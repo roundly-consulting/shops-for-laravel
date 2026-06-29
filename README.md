@@ -11,13 +11,31 @@
 A production-grade e-commerce foundation for Laravel: products with variants, SKUs and
 options, a race-safe inventory ledger with stock reservations, a guarded order state machine,
 a persistent cart with one-call order placement, correct net/gross tax pricing, native
-per-locale translations, a reference coupon/discount engine, and payment & shipping **driver
-contracts** — all with **no third-party runtime dependencies** beyond Laravel itself.
+per-locale translations, and payment & shipping **driver contracts**. Catalog media, product
+reviews, spec-sheet attributes, coupons, store credit, and customer address books are powered
+by sibling roundly-consulting packages (see **Integrates with**).
 
 ## Requirements
 
 - PHP 8.4+
 - Laravel 12.0 or 13.0
+
+## Integrates with
+
+Shops builds directly on these roundly-consulting packages (installed automatically as
+dependencies):
+
+| Package | What it powers in shops |
+|---|---|
+| [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel) | Product featured/gallery images, per-variant images, category banners (public, responsive) |
+| [`reviews-for-laravel`](https://github.com/roundly-consulting/reviews-for-laravel) | Product reviews, rating aggregates, verified-purchase gating |
+| [`attributes-for-laravel`](https://github.com/roundly-consulting/attributes-for-laravel) | Typed, filterable product spec-sheet attributes |
+| [`coupons-for-laravel`](https://github.com/roundly-consulting/coupons-for-laravel) | All coupon/discount logic (percentage, fixed, free shipping, caps, usage limits) |
+| [`credits-for-laravel`](https://github.com/roundly-consulting/credits-for-laravel) | "Pay with store credit" tender and store-credit refunds |
+| [`addresses-for-laravel`](https://github.com/roundly-consulting/addresses-for-laravel) | Customer address book → order billing/shipping snapshot |
+
+See `docs/cross-package-integration-plan.md` for the org-wide tier map. Coupon logic now lives
+entirely in `coupons-for-laravel`; shops no longer ships its own coupon model.
 
 ## Installation
 
@@ -432,45 +450,138 @@ final class UuidNumberGenerator implements NumberGenerator
 }
 ```
 
+### Product media
+
+Products, variants, and categories carry images via `media-library-for-laravel`. Catalog media
+is **public** by default (CDN/SEO friendly) and generates responsive variants from the width
+ladder in `shops.media`.
+
+```php
+use Illuminate\Http\UploadedFile;
+
+$product->addMedia($file)->toMediaBucket($product->featuredBucket()); // single featured image
+$product->addMedia($file)->toMediaBucket($product->galleryBucket());  // multi-image gallery
+
+$product->featuredImageUrl('detail'); // a named responsive variant
+$product->galleryUrls();              // list<string>
+$product->seoImageUrl();              // featured, falling back to the first gallery image
+
+$variant->addMedia($file)->toMediaBucket($variant->variantGalleryBucket());
+$variant->variantImageUrl();
+
+$category->addMedia($file)->toMediaBucket($category->bannerBucket());
+$category->bannerUrl();
+```
+
+Bucket names, disk, visibility, responsive widths, and max file size are configured under
+`shops.media`.
+
+### Reviews
+
+Products are reviewable via `reviews-for-laravel`, with rating aggregates:
+
+```php
+$product->addReview($user)->rating(5)->title('Great')->content('Love it')->approved()->create();
+
+$product->approvedReviewsCount(); // int
+$product->averageRating();        // ?float (approved reviews only)
+$product->ratingDistribution();   // [5 => 12, 4 => 3, ...]
+$product->ratingSummary();        // RatingSummary{average, count, distribution}
+```
+
+**Verified purchase.** `$product->review($user)` pre-flags the review as a verified purchase
+using the bound `VerifiedPurchaseResolver`. The default `NullVerifiedPurchaseResolver` never
+verifies; point `shops.reviews.verified_purchase_resolver` at
+`DatabaseVerifiedPurchaseResolver` to verify buyers with a **paid and fulfilled** order
+containing the product (requires the order to carry a customer — see **Order customer**).
+
+### Spec sheet (attributes)
+
+Typed, validated, filterable product attributes via `attributes-for-laravel` — the descriptive
+spec sheet that complements variant *options* (which define SKUs). Define the schema under
+`shops.attributes.definitions`:
+
+```php
+// config/shops.php
+'attributes' => ['definitions' => [
+    'material' => ['type' => 'string'],
+    'weight'   => ['type' => 'integer', 'rules' => ['min:0']],
+]],
+```
+
+```php
+$product->attachAttribute('material', 'wool');
+$product->attachAttribute('weight', 500);
+$product->attr('material')->string(); // 'wool'
+$product->attr('weight')->int();      // 500
+
+Product::query()->whereAttribute('material', 'wool')->get();
+Product::query()->whereAttributeBetween('weight', 100, 500)->get();
+Product::query()->orderByAttribute('weight', 'desc')->get();
+```
+
+With `attributes.strict` enabled, attaching an undefined attribute throws
+`UnknownAttributeException` and an ill-typed value throws `InvalidAttributeValueException`.
+
 ### Coupons & discounts
 
-The package ships a usable reference `Coupon` model (`RoundlyConsulting\Shops\Discounts\Coupon`)
-implementing the `Coupon` contract: percentage or fixed-amount discounts guarded by usage
-limit, active window, and minimum spend. Point `shops.discounts.coupon_model` at it (or your
-own model) to enable discounts:
+Coupons are powered entirely by `coupons-for-laravel`. Create coupons with that package, then
+reference them by **code** — shops resolves the discount through the bound `DiscountResolver`
+and records the redemption at place-order:
 
 ```php
-use RoundlyConsulting\Shops\Discounts\Coupon;
+use RoundlyConsulting\Coupons\Facades\Coupons;
+use RoundlyConsulting\Coupons\Enums\DiscountType;
+use RoundlyConsulting\Shops\Facades\Shop;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
-$coupon = Coupon::create([
-    'code' => 'WELCOME10',
-    'type' => 'percentage',   // or 'fixed'
-    'value' => 10,            // 10% (percentage) or 10 minor units (fixed)
-    'max_usage' => 100,
-    'minimum_spend' => 5000,  // optional; requires a currency for fixed/min-spend
-    'currency' => 'EUR',
-    'expires_at' => now()->addMonth(),
-]);
+$coupon = Coupons::generate(DiscountType::Percentage, 10, 'WELCOME10');
+$coupon->activate()->save();
 
-$coupon->canBeApplied(Money::EUR(6000)); // checks window, usage and min-spend
-$coupon->apply(Money::EUR(1000));        // 900 EUR (percentage)
+// Preview a discount (no redemption):
+Shop::discountFor('WELCOME10', Money::EUR(1000))->discount; // 100 EUR off
+
+// Price a cart with a code (defaults to the cart's stored coupon_code):
+$cart->price('WELCOME10')->getFinalPrice();
 ```
 
-To swap in your own model, implement the `RoundlyConsulting\Shops\Contracts\Coupon` contract
-(`canBeApplied()`, `apply(Money)`, `recordUsage()`) and register it via the config.
+At place-order the coupon is linked to the order and redeemed once for the buyer (free-shipping
+coupons zero the shipping line). Swap the coupon model or resolver via `shops.discounts`.
 
-Apply a coupon and record its usage transactionally with the `UseCoupon` action:
+### Pay with store credit
+
+With `credits-for-laravel`, buyers can pay all or part of an order from a store-credit bucket.
+Enable `shops.payments.allow_store_credit`; `ChargeOrderAction` then debits available credit
+before charging the gateway for the remainder. Refunds can be returned as store credit via
+`shops.payments.refund_to_store_credit`.
 
 ```php
-use RoundlyConsulting\Shops\Orders\Actions\UseCoupon;
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Shops\Payments\StoreCreditTender;
 
-$discounted = app(UseCoupon::class)->execute($coupon, Money::EUR(1000));
+$remainder = app(StoreCreditTender::class)->apply($order, $customer); // Money still owed
 ```
 
-If the coupon cannot be applied, the original amount is returned unchanged and no usage is
-recorded.
+### Customer address book
+
+With `addresses-for-laravel`, build an order's billing/shipping snapshot from a customer's saved
+addresses. Add `HasAddresses` to your customer model, then:
+
+```php
+use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
+
+$order = Shop::placeOrder($cart, PlaceOrderData::fromAddressBook($customer));
+```
+
+Shipping is taken from the customer's primary shipping address and billing from their primary
+billing address; when no billing address exists, the shipping address is reused (toggle with
+`shops.addresses.billing_same_as_shipping`). The order keeps snapshotting addresses — there is
+no foreign key to the address book.
+
+### Order customer
+
+`Order` carries an optional polymorphic `customer` (the buyer), copied from the cart's owner at
+place-order. It powers the address book, store credit, and verified-purchase reviews. It is
+nullable, so guest orders are fully supported.
 
 ### Payment & shipping drivers
 
