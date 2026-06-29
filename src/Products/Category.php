@@ -8,12 +8,14 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Concerns\HasPublishing;
 use RoundlyConsulting\Shops\Concerns\HasSlug;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\CategoryFactory;
+use RoundlyConsulting\Shops\Products\Concerns\HasCategoryMedia;
 
 /**
  * @property int|null $shop_id
@@ -22,9 +24,10 @@ use RoundlyConsulting\Shops\Database\Factories\CategoryFactory;
  * @property string|null $description
  * @property CarbonInterface|null $published_at
  */
-final class Category extends Model implements Translatable
+final class Category extends Model implements HasMedia, Translatable
 {
     use BelongsToShop;
+    use HasCategoryMedia;
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
     use HasPublishing;

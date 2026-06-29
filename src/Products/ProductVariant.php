@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
 use RoundlyConsulting\Shops\Database\Factories\ProductVariantFactory;
+use RoundlyConsulting\Shops\Products\Concerns\HasVariantMedia;
 use RoundlyConsulting\Shops\Support\Casts\MoneyCast;
 use RoundlyConsulting\Shops\Support\Money\Money;
 
@@ -28,10 +30,11 @@ use RoundlyConsulting\Shops\Support\Money\Money;
  * @property int $position
  * @property-read Product $product
  */
-final class ProductVariant extends Model
+final class ProductVariant extends Model implements HasMedia
 {
     /** @use HasFactory<ProductVariantFactory> */
     use HasFactory;
+    use HasVariantMedia;
     use SoftDeletes;
 
     protected $table = 'product_variants';
