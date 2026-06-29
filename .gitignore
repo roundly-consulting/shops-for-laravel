@@ -1,6 +1,7 @@
 .idea
 .phpunit.cache
 build
+composer.lock
 coverage
 phpunit.xml
 testbench.yaml

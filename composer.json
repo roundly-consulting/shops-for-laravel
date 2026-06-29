@@ -18,9 +18,29 @@
             "role": "Developer"
         }
     ],
+    "repositories": [
+        { "type": "path", "url": "../media-library-for-laravel*", "options": { "symlink": true } },
+        { "type": "vcs", "url": "https://github.com/roundly-consulting/media-library-for-laravel", "no-api": true },
+        { "type": "path", "url": "../reviews-for-laravel*", "options": { "symlink": true } },
+        { "type": "vcs", "url": "https://github.com/roundly-consulting/reviews-for-laravel", "no-api": true },
+        { "type": "path", "url": "../attributes-for-laravel*", "options": { "symlink": true } },
+        { "type": "vcs", "url": "https://github.com/roundly-consulting/attributes-for-laravel", "no-api": true },
+        { "type": "path", "url": "../coupons-for-laravel*", "options": { "symlink": true } },
+        { "type": "vcs", "url": "https://github.com/roundly-consulting/coupons-for-laravel", "no-api": true },
+        { "type": "path", "url": "../credits-for-laravel*", "options": { "symlink": true } },
+        { "type": "vcs", "url": "https://github.com/roundly-consulting/credits-for-laravel", "no-api": true },
+        { "type": "path", "url": "../addresses-for-laravel*", "options": { "symlink": true } },
+        { "type": "vcs", "url": "https://github.com/roundly-consulting/addresses-for-laravel", "no-api": true }
+    ],
     "require": {
         "php": "^8.4",
-        "illuminate/contracts": "^12.0|^13.0"
+        "illuminate/contracts": "^12.0|^13.0",
+        "roundly-consulting/addresses-for-laravel": "@dev",
+        "roundly-consulting/attributes-for-laravel": "@dev",
+        "roundly-consulting/coupons-for-laravel": "@dev",
+        "roundly-consulting/credits-for-laravel": "@dev",
+        "roundly-consulting/media-library-for-laravel": "@dev",
+        "roundly-consulting/reviews-for-laravel": "@dev"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
