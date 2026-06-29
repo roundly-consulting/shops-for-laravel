@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders\DataTransferObjects;
 
-use RoundlyConsulting\Shops\Contracts\Coupon;
 use RoundlyConsulting\Shops\Contracts\TaxResolver;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Shops\Shop;
@@ -16,8 +15,11 @@ use RoundlyConsulting\Shops\Support\Money\Money;
  * Each {@see PriceLine} is taxed per line at its tax class's rate. For the
  * `gross` price type the tax is *extracted* from the (tax-inclusive) line
  * price; for the `net` price type the tax is *added on top*. Lines are summed,
- * then any coupon discount and shipping are applied. All arithmetic stays in
- * minor units and rounds half-up at the line level.
+ * then any resolved discount and shipping are applied. The discount is supplied
+ * pre-computed (see DiscountResolver, backed by coupons-for-laravel) so this
+ * value object stays free of coupon logic. Free-shipping coupons zero the
+ * shipping line. All arithmetic stays in minor units and rounds half-up at the
+ * line level.
  */
 final readonly class Price
 {
@@ -31,7 +33,8 @@ final readonly class Price
         public Money $shipping,
         public PriceType $priceType = PriceType::Gross,
         ?TaxResolver $taxResolver = null,
-        public ?Coupon $coupon = null,
+        public ?Money $discount = null,
+        public bool $freeShipping = false,
         private string $currency = 'EUR',
         private ?Shop $shop = null,
         private ?string $country = null,
@@ -82,14 +85,21 @@ final readonly class Price
     }
 
     /**
-     * The goods value after any coupon discount, in the price type's meaning,
-     * excluding shipping.
+     * The goods value after any resolved discount, in the price type's meaning,
+     * excluding shipping. The discount is capped at the subtotal so goods never
+     * drop below zero.
      */
     public function getPriceAfterDiscount(): Money
     {
         $subtotal = $this->sumLines();
 
-        return $this->coupon?->apply($subtotal) ?? $subtotal;
+        if ($this->discount === null || ! $this->discount->isPositive()) {
+            return $subtotal;
+        }
+
+        $capped = $this->discount->compareTo($subtotal) >= 0 ? $subtotal : $this->discount;
+
+        return $subtotal->subtract($capped);
     }
 
     /**
@@ -113,7 +123,20 @@ final readonly class Price
             $goods = $goods->add($this->getTaxPrice());
         }
 
-        return $goods->add($this->shipping);
+        return $goods->add($this->shippingCost());
+    }
+
+    /**
+     * The shipping charge actually applied: zero when a free-shipping coupon is
+     * in effect, otherwise the quoted shipping.
+     */
+    public function shippingCost(): Money
+    {
+        if ($this->freeShipping) {
+            return Money::zero($this->shipping->getCurrency()->getCode());
+        }
+
+        return $this->shipping;
     }
 
     private function sumLines(): Money

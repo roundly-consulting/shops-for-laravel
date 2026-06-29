@@ -6,7 +6,7 @@ namespace RoundlyConsulting\Shops\Orders\Concerns;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
-use RoundlyConsulting\Shops\Contracts\Coupon;
+use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
@@ -39,20 +39,52 @@ trait HasPrice
                 );
             }
 
-            $coupon = $this->coupon;
             $currency = (string) config('shops.pricing.default_currency', 'EUR');
+            $priceType = PriceType::from((string) config('shops.pricing.price_type', 'gross'));
+
+            $base = new Price(
+                lines: $lines,
+                shipping: Money::zero($currency),
+                priceType: $priceType,
+                taxResolver: null,
+                currency: $currency,
+                shop: $this->resolveShop(),
+                country: $this->resolveCountry(),
+            );
+
+            $code = $this->couponCode();
+
+            if ($code === null) {
+                return $base;
+            }
+
+            $result = app(DiscountResolver::class)->resolve($code, $base->getSubtotal());
 
             return new Price(
                 lines: $lines,
                 shipping: Money::zero($currency),
-                priceType: PriceType::from((string) config('shops.pricing.price_type', 'gross')),
+                priceType: $priceType,
                 taxResolver: null,
-                coupon: $coupon instanceof Coupon ? $coupon : null,
+                discount: $result->discount,
+                freeShipping: $result->freeShipping,
                 currency: $currency,
                 shop: $this->resolveShop(),
                 country: $this->resolveCountry(),
             );
         });
+    }
+
+    private function couponCode(): ?string
+    {
+        $coupon = $this->getAttribute('coupon');
+
+        if (! $coupon instanceof Model) {
+            return null;
+        }
+
+        $code = $coupon->getAttribute('code');
+
+        return is_string($code) && $code !== '' ? $code : null;
     }
 
     private function resolveShop(): ?Shop

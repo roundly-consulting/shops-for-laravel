@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops;
 
 use RoundlyConsulting\Shops\Cart\Cart;
-use RoundlyConsulting\Shops\Contracts\Coupon;
+use RoundlyConsulting\Shops\Contracts\DiscountResolver;
+use RoundlyConsulting\Shops\Discounts\DiscountResult;
 use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
 use RoundlyConsulting\Shops\Orders\Actions\PlaceOrderAction;
 use RoundlyConsulting\Shops\Orders\Actions\TransitionOrderStatusAction;
-use RoundlyConsulting\Shops\Orders\Actions\UseCoupon;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Order;
@@ -26,7 +26,7 @@ final class ShopManager
         private readonly PlaceOrderAction $placeOrder,
         private readonly TransitionOrderStatusAction $transition,
         private readonly ChargeOrderAction $charge,
-        private readonly UseCoupon $useCoupon,
+        private readonly DiscountResolver $discounts,
     ) {}
 
     public function placeOrder(Cart $cart, PlaceOrderData $data = new PlaceOrderData): Order
@@ -44,8 +44,12 @@ final class ShopManager
         return $this->charge->execute($order);
     }
 
-    public function useCoupon(Coupon $coupon, Money $money): Money
+    /**
+     * Preview the discount a coupon code applies to a goods subtotal, via the
+     * coupons-backed DiscountResolver. Does not record a redemption.
+     */
+    public function discountFor(string $code, Money $goods): DiscountResult
     {
-        return $this->useCoupon->execute($coupon, $money);
+        return $this->discounts->resolve($code, $goods);
     }
 }

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Cart\Concerns\HasOwner;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
-use RoundlyConsulting\Shops\Contracts\Coupon;
+use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Database\Factories\CartFactory;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
@@ -87,7 +87,13 @@ final class Cart extends Model
         return $this->price()->getSubtotal();
     }
 
-    public function price(?Coupon $coupon = null): Price
+    /**
+     * Price the cart, optionally applying a coupon. The code defaults to the
+     * cart's stored `coupon_code`; pass one explicitly to preview a different
+     * code. The discount is resolved through the coupons-backed DiscountResolver
+     * without recording a redemption (that happens at place-order).
+     */
+    public function price(?string $couponCode = null): Price
     {
         $lines = [];
 
@@ -100,13 +106,32 @@ final class Cart extends Model
         }
 
         $shop = $this->shop_id !== null && $this->shop instanceof Shop ? $this->shop : null;
+        $priceType = PriceType::from((string) config('shops.pricing.price_type', 'gross'));
+
+        $base = new Price(
+            lines: $lines,
+            shipping: Money::zero($this->currency),
+            priceType: $priceType,
+            taxResolver: null,
+            currency: $this->currency,
+            shop: $shop,
+        );
+
+        $code = $couponCode ?? $this->coupon_code;
+
+        if ($code === null || $code === '') {
+            return $base;
+        }
+
+        $result = app(DiscountResolver::class)->resolve($code, $base->getSubtotal());
 
         return new Price(
             lines: $lines,
             shipping: Money::zero($this->currency),
-            priceType: PriceType::from((string) config('shops.pricing.price_type', 'gross')),
+            priceType: $priceType,
             taxResolver: null,
-            coupon: $coupon,
+            discount: $result->discount,
+            freeShipping: $result->freeShipping,
             currency: $this->currency,
             shop: $shop,
         );
