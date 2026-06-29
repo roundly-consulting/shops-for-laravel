@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Coupons\Models\Coupon;
 use RoundlyConsulting\Shops\Cart\Cart;
-use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Facades\Shop;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Order;
@@ -44,8 +44,11 @@ it('charges an order through the facade', function (): void {
         ->and($order->refresh()->status)->toBe(Status::Paid);
 });
 
-it('applies a coupon through the facade', function (): void {
-    $coupon = Coupon::factory()->percentage(10)->create();
+it('previews a coupon discount through the facade', function (): void {
+    Coupon::factory()->percentage(10)->active()->create(['code' => 'SAVE10']);
 
-    expect(Shop::useCoupon($coupon, Money::EUR(1000))->getAmount())->toBe('900');
+    $result = Shop::discountFor('SAVE10', Money::EUR(1000));
+
+    expect($result->discount->getAmount())->toBe('100')
+        ->and($result->found)->toBeTrue();
 });

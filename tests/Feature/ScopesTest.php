@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
 use RoundlyConsulting\Shops\Cart\Cart;
-use RoundlyConsulting\Shops\Discounts\Coupon;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\Category;
@@ -93,7 +92,6 @@ it('resolves a Shop instance for each owned model', function (callable $make): v
 })->with([
     'product' => [fn (Shop $shop) => Product::factory()->create(['shop_id' => $shop->id])],
     'category' => [fn (Shop $shop) => Category::factory()->create(['shop_id' => $shop->id])],
-    'coupon' => [fn (Shop $shop) => Coupon::factory()->create(['shop_id' => $shop->id])],
     'cart' => [fn (Shop $shop) => Cart::factory()->create(['shop_id' => $shop->id])],
     'order' => [fn (Shop $shop) => Order::factory()->create(['shop_id' => $shop->id])],
     'item' => [fn (Shop $shop) => Item::factory()->create(['shop_id' => $shop->id])],

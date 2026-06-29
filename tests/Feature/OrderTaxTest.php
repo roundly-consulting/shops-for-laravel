@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Coupons\Models\Coupon;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\Shops\TaxRate;
-use RoundlyConsulting\Shops\Tests\Fixtures\TestCoupon;
 
 beforeEach(function (): void {
     config()->set('shops.pricing.default_currency', 'EUR');
@@ -60,7 +60,7 @@ it('scales tax proportionally with a coupon after the basis-point change', funct
         'tax_class' => 'standard', 'rate' => 2000,
     ]);
 
-    $coupon = TestCoupon::factory()->create(['value' => 10]);
+    $coupon = Coupon::factory()->percentage(10)->active()->create(['code' => 'SAVE10']);
     $order = Order::factory()->create(['shop_id' => $shop->id, 'coupon_id' => $coupon->id]);
     Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
 

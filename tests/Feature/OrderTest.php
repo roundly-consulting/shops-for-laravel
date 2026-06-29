@@ -5,13 +5,13 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Coupons\Models\Coupon;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Support\Money\Money;
-use RoundlyConsulting\Shops\Tests\Fixtures\TestCoupon;
 
 it('has relationships', function (): void {
     $order = new Order;
@@ -44,7 +44,7 @@ it('returns a zero price for an order without items', function (): void {
 });
 
 it('applies a coupon discount to the order price', function (): void {
-    $coupon = TestCoupon::factory()->create(['value' => 10]);
+    $coupon = Coupon::factory()->percentage(10)->active()->create(['code' => 'SAVE10']);
     $order = Order::factory()->create(['coupon_id' => $coupon->id]);
 
     Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();

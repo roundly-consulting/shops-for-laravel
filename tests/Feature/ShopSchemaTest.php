@@ -10,7 +10,6 @@ it('gives every owned table a shop_id and no shop_type column', function (string
 })->with([
     'products',
     'product_categories',
-    'coupons',
     'carts',
     'orders',
     'order_items',

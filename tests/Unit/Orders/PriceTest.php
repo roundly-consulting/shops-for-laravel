@@ -8,7 +8,6 @@ use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Support\Money\Money;
 use RoundlyConsulting\Shops\Support\Tax\ConfigTaxResolver;
 use RoundlyConsulting\Shops\Tests\Fixtures\FixedRateResolver;
-use RoundlyConsulting\Shops\Tests\Fixtures\TestCoupon;
 
 it('multiplies the line price by its quantity (G4 regression)', function (): void {
     $price = new Price(
@@ -89,20 +88,44 @@ it('returns a zero price in the default currency for an empty line set', functio
         ->and($price->getFinalPrice()->getAmount())->toBe('0');
 });
 
-it('applies a coupon discount and scales tax proportionally', function (): void {
-    $coupon = new TestCoupon(['value' => 10, 'usage' => 0, 'max_usage' => 5]);
-
+it('applies a resolved discount and scales tax proportionally', function (): void {
     $price = new Price(
         lines: [new PriceLine(Money::EUR(1000), taxClass: 'standard')],
         shipping: Money::zero('EUR'),
         priceType: PriceType::Net,
         taxResolver: new ConfigTaxResolver,
-        coupon: $coupon,
+        discount: Money::EUR(100),
     );
 
     expect($price->getDiscountValue()->getAmount())->toBe('100')
         ->and($price->getPriceAfterDiscount()->getAmount())->toBe('900')
         ->and($price->getTaxPrice()->getAmount())->toBe('180');
+});
+
+it('caps a discount at the subtotal so goods never go negative', function (): void {
+    $price = new Price(
+        lines: [new PriceLine(Money::EUR(1000), taxClass: 'zero')],
+        shipping: Money::zero('EUR'),
+        priceType: PriceType::Net,
+        taxResolver: new ConfigTaxResolver,
+        discount: Money::EUR(5000),
+    );
+
+    expect($price->getPriceAfterDiscount()->getAmount())->toBe('0')
+        ->and($price->getDiscountValue()->getAmount())->toBe('1000');
+});
+
+it('zeroes shipping for a free-shipping coupon', function (): void {
+    $price = new Price(
+        lines: [new PriceLine(Money::EUR(1000), taxClass: 'zero')],
+        shipping: Money::EUR(500),
+        priceType: PriceType::Net,
+        taxResolver: new ConfigTaxResolver,
+        freeShipping: true,
+    );
+
+    expect($price->getFinalPrice()->getAmount())->toBe('1000')
+        ->and($price->shippingCost()->getAmount())->toBe('0');
 });
 
 it('reports a zero discount when no coupon is set', function (): void {
