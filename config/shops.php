@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-use RoundlyConsulting\Shops\Discounts\Coupon;
+use RoundlyConsulting\Coupons\Models\Coupon;
+use RoundlyConsulting\Shops\Discounts\CouponPackageDiscountResolver;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
 use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
+use RoundlyConsulting\Shops\Reviews\NullVerifiedPurchaseResolver;
 use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;
 use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver;
@@ -92,6 +94,72 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Catalog Media (media-library)
+    |--------------------------------------------------------------------------
+    |
+    | Product, variant, and category imagery is stored via
+    | roundly-consulting/media-library-for-laravel. Catalog images are public by
+    | default (served over a CDN for SEO) with a responsive width ladder used to
+    | generate srcset variants. "disk" defaults to the media package's configured
+    | disk when null; "max_file_size" is an optional per-image byte cap.
+    |
+    */
+
+    'media' => [
+        'featured_bucket' => env('SHOPS_MEDIA_FEATURED_BUCKET', 'featured'),
+        'gallery_bucket' => env('SHOPS_MEDIA_GALLERY_BUCKET', 'gallery'),
+        'variant_bucket' => env('SHOPS_MEDIA_VARIANT_BUCKET', 'gallery'),
+        'banner_bucket' => env('SHOPS_MEDIA_BANNER_BUCKET', 'banner'),
+        'disk' => env('SHOPS_MEDIA_DISK'),
+        'public' => env('SHOPS_MEDIA_PUBLIC', true),
+        'responsive_widths' => [320, 640, 1024, 1600],
+        'max_file_size' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reviews (reviews)
+    |--------------------------------------------------------------------------
+    |
+    | Products are reviewable via roundly-consulting/reviews-for-laravel.
+    | "verified_purchase_resolver" decides whether a review by a buyer is flagged
+    | as a verified purchase. The default NullVerifiedPurchaseResolver never
+    | verifies; point it at DatabaseVerifiedPurchaseResolver (which checks for a
+    | paid + fulfilled order containing the product, using the optional
+    | Order.customer link) or your own implementation to enforce the gate.
+    |
+    */
+
+    'reviews' => [
+        'verified_purchase_resolver' => env(
+            'SHOPS_VERIFIED_PURCHASE_RESOLVER',
+            NullVerifiedPurchaseResolver::class,
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Product Attributes (attributes)
+    |--------------------------------------------------------------------------
+    |
+    | Typed, validated spec-sheet attributes for products, backed by
+    | roundly-consulting/attributes-for-laravel. These complement variant
+    | *options* (which define SKUs): options are the purchasable axes, attributes
+    | are the descriptive, filterable spec sheet. Each definition is keyed by
+    | name with a "type" (string/integer/float/boolean/array/datetime) plus
+    | optional "rules", "default", "required", and "unique".
+    |
+    */
+
+    'attributes' => [
+        'definitions' => [
+            // 'material' => ['type' => 'string'],
+            // 'weight'   => ['type' => 'integer', 'rules' => ['min:0']],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Locales
     |--------------------------------------------------------------------------
     |
@@ -117,6 +185,24 @@ return [
 
     'payment' => [
         'gateway' => env('SHOPS_PAYMENT_GATEWAY', NullPaymentGateway::class),
+
+        /*
+        |----------------------------------------------------------------------
+        | Store Credit (credits)
+        |----------------------------------------------------------------------
+        |
+        | When "allow_store_credit" is on, ChargeOrderAction applies the buyer's
+        | available store credit (from roundly-consulting/credits-for-laravel)
+        | before charging the gateway, allowing full or partial payment with
+        | credit. "store_credit_bucket" is the credits bucket used.
+        | "refund_to_store_credit" grants a refunded order's total back to the
+        | buyer as store credit instead of a gateway refund.
+        |
+        */
+
+        'allow_store_credit' => env('SHOPS_ALLOW_STORE_CREDIT', false),
+        'store_credit_bucket' => env('SHOPS_STORE_CREDIT_BUCKET', 'store_credit'),
+        'refund_to_store_credit' => env('SHOPS_REFUND_TO_STORE_CREDIT', false),
     ],
 
     /*
@@ -136,18 +222,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Discounts
+    | Discounts (coupons)
     |--------------------------------------------------------------------------
     |
-    | "coupon_model" is the Eloquent model backing an order's coupon relation.
-    | It must implement RoundlyConsulting\Shops\Contracts\Coupon. The package
-    | ships a usable reference Coupon model; point this at your own model to
-    | swap it.
+    | Coupons are powered by roundly-consulting/coupons-for-laravel. "coupon_model"
+    | is the Eloquent model backing an order's coupon relation (the coupons
+    | package model by default; point at your own subclass to extend it).
+    | "resolver" is the DiscountResolver that turns a code + goods subtotal into a
+    | discount; the shipped resolver adapts the coupons package.
     |
     */
 
     'discounts' => [
         'coupon_model' => env('SHOPS_COUPON_MODEL', Coupon::class),
+        'resolver' => CouponPackageDiscountResolver::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Addresses (addresses)
+    |--------------------------------------------------------------------------
+    |
+    | When building an order from a customer's saved addresses (via
+    | PlaceOrderData::fromAddressBook), "billing_same_as_shipping" copies the
+    | primary shipping address into billing when the customer has no primary
+    | billing address.
+    |
+    */
+
+    'addresses' => [
+        'billing_same_as_shipping' => env('SHOPS_BILLING_SAME_AS_SHIPPING', true),
     ],
 
     'orders' => [
@@ -164,17 +268,6 @@ return [
         */
 
         'number_generator' => DefaultNumberGenerator::class,
-
-        /*
-        |----------------------------------------------------------------------
-        | Coupon Model (deprecated alias)
-        |----------------------------------------------------------------------
-        |
-        | Kept for backward compatibility; prefer "discounts.coupon_model".
-        |
-        */
-
-        'coupon_model' => env('SHOPS_COUPON_MODEL'),
 
     ],
 
