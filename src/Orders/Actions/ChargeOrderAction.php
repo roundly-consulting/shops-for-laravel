@@ -4,25 +4,34 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders\Actions;
 
+use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\Credits\Interfaces\Creditable;
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
+use RoundlyConsulting\Shops\Payments\StoreCreditTender;
 
 /**
- * Charges an order through the configured payment gateway. On success the order
- * is transitioned to Paid (moving through InProgress first when it is still New);
- * a failed charge leaves the status unchanged.
+ * Charges an order through the configured payment gateway. When store-credit
+ * tender is enabled (`shops.payments.allow_store_credit`) and the order has a
+ * creditable buyer, available store credit is applied first and only the
+ * remainder is charged. On success the order is transitioned to Paid (moving
+ * through InProgress first when it is still New); a failed charge leaves the
+ * status unchanged.
  */
 final class ChargeOrderAction
 {
     public function __construct(
         private readonly PaymentGateway $gateway,
         private readonly TransitionOrderStatusAction $transition,
+        private readonly StoreCreditTender $storeCredit,
     ) {}
 
     public function execute(Order $order): PaymentResult
     {
+        $this->applyStoreCredit($order);
+
         $result = $this->gateway->charge($order);
 
         if (! $result->successful) {
@@ -36,5 +45,22 @@ final class ChargeOrderAction
         $this->transition->execute($order, Status::Paid);
 
         return $result;
+    }
+
+    private function applyStoreCredit(Order $order): void
+    {
+        if (! (bool) config('shops.payments.allow_store_credit', false)) {
+            return;
+        }
+
+        if ($order->store_credit_applied !== null) {
+            return;
+        }
+
+        $customer = $order->customer;
+
+        if ($customer instanceof Model && $customer instanceof Creditable) {
+            $this->storeCredit->apply($order, $customer);
+        }
     }
 }
