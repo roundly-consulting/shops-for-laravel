@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders\Enums;
 
+use RoundlyConsulting\Enums\Helpers;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 
 /**
@@ -12,6 +13,8 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
  */
 enum PriceType: string
 {
+    use Helpers;
+
     case Net = 'net';
     case Gross = 'gross';
 }

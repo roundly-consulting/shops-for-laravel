@@ -4,27 +4,18 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders\Enums;
 
+use RoundlyConsulting\Enums\Helpers;
+
 enum Status: string
 {
+    use Helpers;
+
     case New = 'New';
     case InProgress = 'InProgress';
     case Paid = 'Paid';
     case Fulfilled = 'Fulfilled';
     case Canceled = 'Canceled';
     case Refunded = 'Refunded';
-
-    public function is(self $status): bool
-    {
-        return $this === $status;
-    }
-
-    /**
-     * @param  array<int, self>  $statuses
-     */
-    public function isIn(array $statuses): bool
-    {
-        return in_array($this, $statuses, true);
-    }
 
     public function canTransitionTo(self $to): bool
     {

@@ -74,3 +74,31 @@ it('maps each status to its timestamp column', function (Status $status, ?string
     [Status::Canceled, 'canceled_at'],
     [Status::Refunded, 'refunded_at'],
 ]);
+
+it('exposes readable labels via the enums trait', function (): void {
+    expect(Status::InProgress->label())->toBe('In Progress')
+        ->and(Status::New->readable())->toBe('New')
+        ->and(Status::labels()->all())->toBe([
+            'New', 'In Progress', 'Paid', 'Fulfilled', 'Canceled', 'Refunded',
+        ]);
+});
+
+it('builds select options via the enums trait', function (): void {
+    expect(Status::values()->all())->toBe([
+        'New', 'InProgress', 'Paid', 'Fulfilled', 'Canceled', 'Refunded',
+    ])->and(Status::options()->first()->toArray())->toBe([
+        'value' => 'New',
+        'label' => 'New',
+        'name' => 'New',
+    ]);
+});
+
+it('builds a validation rule via the enums trait', function (): void {
+    expect(Status::validationRule())
+        ->toBe('in:New,InProgress,Paid,Fulfilled,Canceled,Refunded');
+});
+
+it('resolves cases by name via the enums trait', function (): void {
+    expect(Status::tryFromName('Paid'))->toBe(Status::Paid)
+        ->and(Status::tryFromName('Missing'))->toBeNull();
+});

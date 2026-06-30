@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Inventory\Enums;
 
+use RoundlyConsulting\Enums\Helpers;
+
 enum StockReason: string
 {
+    use Helpers;
+
     case Received = 'Received';
     case Sold = 'Sold';
     case Reserved = 'Reserved';

@@ -19,6 +19,8 @@
         }
     ],
     "repositories": [
+        { "type": "path", "url": "../enums-for-laravel*", "options": { "symlink": true } },
+        { "type": "vcs", "url": "https://github.com/roundly-consulting/enums-for-laravel", "no-api": true },
         { "type": "path", "url": "../media-library-for-laravel*", "options": { "symlink": true } },
         { "type": "vcs", "url": "https://github.com/roundly-consulting/media-library-for-laravel", "no-api": true },
         { "type": "path", "url": "../reviews-for-laravel*", "options": { "symlink": true } },
@@ -39,6 +41,7 @@
         "roundly-consulting/attributes-for-laravel": "@dev",
         "roundly-consulting/coupons-for-laravel": "@dev",
         "roundly-consulting/credits-for-laravel": "@dev",
+        "roundly-consulting/enums-for-laravel": "@dev",
         "roundly-consulting/media-library-for-laravel": "@dev",
         "roundly-consulting/reviews-for-laravel": "@dev"
     },

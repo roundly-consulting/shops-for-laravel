@@ -14,3 +14,17 @@ it('identifies reasons that affect the reserved quantity', function (StockReason
     [StockReason::Returned, false],
     [StockReason::Manual, false],
 ]);
+
+it('exposes labels, options and a validation rule via the enums trait', function (): void {
+    expect(StockReason::Received->label())->toBe('Received')
+        ->and(StockReason::labels()->all())->toBe([
+            'Received', 'Sold', 'Reserved', 'Released', 'Returned', 'Manual',
+        ])
+        ->and(StockReason::validationRule())
+        ->toBe('in:Received,Sold,Reserved,Released,Returned,Manual')
+        ->and(StockReason::options()->first()->toArray())->toBe([
+            'value' => 'Received',
+            'label' => 'Received',
+            'name' => 'Received',
+        ]);
+});
