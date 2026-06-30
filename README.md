@@ -27,6 +27,7 @@ dependencies):
 
 | Package | What it powers in shops |
 |---|---|
+| [`enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel) | Order `Status`, `PriceType` and `StockReason` get `labels()`/`options()`/`validationRule()` and other helpers |
 | [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel) | Product featured/gallery images, per-variant images, category banners (public, responsive) |
 | [`reviews-for-laravel`](https://github.com/roundly-consulting/reviews-for-laravel) | Product reviews, rating aggregates, verified-purchase gating |
 | [`attributes-for-laravel`](https://github.com/roundly-consulting/attributes-for-laravel) | Typed, filterable product spec-sheet attributes |
