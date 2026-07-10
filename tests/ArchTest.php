@@ -10,9 +10,33 @@ arch('it declares strict types')
     ->expect('RoundlyConsulting\Shops')
     ->toUseStrictTypes();
 
-arch('it does not depend on acme')
+arch('src only uses allowed vendor roots')
     ->expect('RoundlyConsulting\Shops')
-    ->not->toUse('Acme');
+    ->toOnlyUse([
+        'RoundlyConsulting\Shops',
+        'RoundlyConsulting\Shops\Database\Factories',
+        'RoundlyConsulting\Addresses',
+        'RoundlyConsulting\Attributes',
+        'RoundlyConsulting\Coupons',
+        'RoundlyConsulting\Credits',
+        'RoundlyConsulting\Enums',
+        'RoundlyConsulting\MediaLibrary',
+        'RoundlyConsulting\Reviews',
+        'Illuminate',
+        'Carbon',
+        'Closure',
+        'RuntimeException',
+        // native helpers used unqualified
+        'app',
+        'config',
+        'config_path',
+        'database_path',
+        'now',
+        'event',
+        'resolve',
+        'blank',
+        '__',
+    ]);
 
 it('exposes a single public execute method on every action', function (): void {
     $actions = collect(glob(__DIR__.'/../src/**/Actions/*.php') ?: [])
