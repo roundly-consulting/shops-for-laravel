@@ -59,8 +59,11 @@ Optionally publish the config file:
 php artisan vendor:publish --tag="shops-config"
 ```
 
-The migrations are also auto-discovered, so the package works without publishing them if you
-prefer to keep them inside the package.
+Migrations are **publish-only** — the package never loads them itself, so publishing is a
+required step, not an optional one. The fourteen files publish in dependency order (shops →
+products → variants → carts → orders), so a single `php artisan migrate` applies them cleanly.
+The six provider packages shops builds on (media-library, reviews, attributes, coupons, credits,
+addresses) publish their own migrations the same way — publish each before migrating.
 
 ## Configuration
 
@@ -552,9 +555,10 @@ coupons zero the shipping line). Swap the coupon model or resolver via `shops.di
 ### Pay with store credit
 
 With `credits-for-laravel`, buyers can pay all or part of an order from a store-credit bucket.
-Enable `shops.payments.allow_store_credit`; `ChargeOrderAction` then debits available credit
-before charging the gateway for the remainder. Refunds can be returned as store credit via
-`shops.payments.refund_to_store_credit`.
+Enable `shops.payment.allow_store_credit` (env `SHOPS_ALLOW_STORE_CREDIT`); `ChargeOrderAction`
+then debits available credit before charging the gateway for the remainder. The bucket is
+`shops.payment.store_credit_bucket`, and refunds can be returned as store credit via
+`shops.payment.refund_to_store_credit`.
 
 ```php
 use RoundlyConsulting\Shops\Payments\StoreCreditTender;
