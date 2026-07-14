@@ -58,6 +58,6 @@ final class StoreCreditTender
 
     private function bucket(): string
     {
-        return (string) config('shops.payments.store_credit_bucket', 'store_credit');
+        return (string) config('shops.payment.store_credit_bucket', 'store_credit');
     }
 }
