@@ -7,23 +7,23 @@ namespace RoundlyConsulting\Shops\Orders\Concerns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use RoundlyConsulting\Coupons\Models\Coupon;
+use RoundlyConsulting\Shops\Support\CouponModel;
 
 /**
  * The order's optional coupon, resolved from coupons-for-laravel (swap the model
  * via `shops.discounts.coupon_model`).
  *
  * @phpstan-require-extends Model
+ *
+ * @property-read Coupon|null $coupon
  */
 trait HasCoupon
 {
     /**
-     * @return BelongsTo<Model, $this>
+     * @return BelongsTo<Coupon, $this>
      */
     public function coupon(): BelongsTo
     {
-        /** @var class-string<Model> $model */
-        $model = config('shops.discounts.coupon_model', Coupon::class);
-
-        return $this->belongsTo($model);
+        return $this->belongsTo(CouponModel::class());
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use RoundlyConsulting\Shops\Shops\CurrentShop;
 use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\Support\ShopModel;
 
 /**
  * Marks a model as owned by a {@see Shop} tenant through a plain `shop_id`
@@ -38,7 +39,7 @@ trait BelongsToShop
      */
     public function shop(): BelongsTo
     {
-        return $this->belongsTo(Shop::resolveModelClass(), 'shop_id');
+        return $this->belongsTo(ShopModel::class(), 'shop_id');
     }
 
     /**

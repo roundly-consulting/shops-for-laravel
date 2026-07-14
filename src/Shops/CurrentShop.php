@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Shops\Shops;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
+use RoundlyConsulting\Shops\Support\ShopModel;
 
 /**
  * Holds the shop that owns records created in the current container context.
@@ -35,11 +36,8 @@ final class CurrentShop
             return null;
         }
 
-        /** @var class-string<Model> $class */
-        $class = Shop::resolveModelClass();
-
         /** @var Model|null $model */
-        $model = $class::query()->find($this->shop);
+        $model = ShopModel::query()->find($this->shop);
 
         $this->shop = $model;
 

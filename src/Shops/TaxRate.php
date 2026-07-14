@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use RoundlyConsulting\Shops\Database\Factories\TaxRateFactory;
+use RoundlyConsulting\Shops\Support\ShopModel;
 use RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver;
 use RoundlyConsulting\Shops\Support\Tax\TaxRateValue;
 
@@ -57,7 +58,7 @@ final class TaxRate extends Model
      */
     public function shop(): BelongsTo
     {
-        return $this->belongsTo(Shop::resolveModelClass(), 'shop_id');
+        return $this->belongsTo(ShopModel::class(), 'shop_id');
     }
 
     public function toValue(): TaxRateValue

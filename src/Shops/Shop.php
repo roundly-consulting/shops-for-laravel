@@ -14,6 +14,7 @@ use RoundlyConsulting\Shops\Concerns\HasSlug;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\ShopFactory;
+use RoundlyConsulting\Shops\Support\ShopModel;
 
 /**
  * The concrete tenant a shop-owned record belongs to. Every owned model
@@ -24,13 +25,17 @@ use RoundlyConsulting\Shops\Database\Factories\ShopFactory;
  * {@see BelongsToShop} resolve through
  * {@see Shop::resolveModelClass()} so a host can ship its own tenant model.
  *
+ * Not `final` on purpose: `shops.shop_model` documents extending this model, and
+ * `Shop::current()` only hands back a shop it recognises — both of which a final
+ * class makes impossible.
+ *
  * @property int $id
  * @property string $name
  * @property string $slug
  * @property string|null $currency
  * @property-read Collection<int, TaxRate> $taxRates
  */
-final class Shop extends Model implements Translatable
+class Shop extends Model implements Translatable
 {
     /** @use HasFactory<ShopFactory> */
     use HasFactory;
@@ -94,10 +99,7 @@ final class Shop extends Model implements Translatable
      */
     public static function resolveModelClass(): string
     {
-        /** @var class-string<Model> $class */
-        $class = config('shops.shop_model', self::class);
-
-        return $class;
+        return ShopModel::class();
     }
 
     /**
