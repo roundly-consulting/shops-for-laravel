@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Orchestra\Testbench\TestCase as Orchestra;
+use ReflectionClass;
 use RoundlyConsulting\Addresses\AddressesServiceProvider;
 use RoundlyConsulting\Attributes\AttributesServiceProvider;
 use RoundlyConsulting\Coupons\CouponsServiceProvider;
@@ -74,6 +75,9 @@ abstract class TestCase extends Orchestra
 
     protected function defineDatabaseMigrations(): void
     {
+        $this->loadProviderSchema();
+
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadMigrationsFrom(__DIR__.'/database/migrations');
 
         Schema::create('customers', function (Blueprint $table): void {
@@ -81,5 +85,28 @@ abstract class TestCase extends Orchestra
             $table->string('name')->nullable();
             $table->timestamps();
         });
+    }
+
+    /**
+     * Run the migrations of the provider packages the shop integrations depend on.
+     * Packages publish their migrations rather than loading them, so the suite has to
+     * run each provider's directory itself.
+     */
+    private function loadProviderSchema(): void
+    {
+        $providers = [
+            MediaLibraryServiceProvider::class,
+            AttributesServiceProvider::class,
+            CouponsServiceProvider::class,
+            CreditsServiceProvider::class,
+            AddressesServiceProvider::class,
+            ReviewsServiceProvider::class,
+        ];
+
+        foreach ($providers as $provider) {
+            $base = dirname((string) (new ReflectionClass($provider))->getFileName(), 2);
+
+            $this->loadMigrationsFrom($base.'/database/migrations');
+        }
     }
 }
