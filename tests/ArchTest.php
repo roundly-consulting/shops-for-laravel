@@ -2,13 +2,50 @@
 
 declare(strict_types=1);
 
-arch('it does not use debugging functions')
-    ->expect(['dd', 'dump', 'ray', 'var_dump'])
-    ->not->toBeUsed();
+use RoundlyConsulting\Coupons\Models\Coupon;
+use RoundlyConsulting\Shops\Exceptions\ShopsException;
+use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
+use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Testing\Arch\ArchPresets;
 
-arch('it declares strict types')
-    ->expect('RoundlyConsulting\Shops')
-    ->toUseStrictTypes();
+// ── Shared presets ───────────────────────────────────────────────────────────
+
+ArchPresets::strictTypes('RoundlyConsulting\Shops');
+
+// Three intentional extension points are exempt: Shop, which `shops.shop_model`
+// invites a host to subclass (pinned by the preset below instead); ShopsException,
+// the base every shop error extends so a host can catch them uniformly; and
+// DefaultNumberGenerator, which `shops.orders.number_generator` invites a host to
+// extend rather than reimplement the whole NumberGenerator contract.
+ArchPresets::finalByDefault('RoundlyConsulting\Shops')
+    ->ignoring([Shop::class, ShopsException::class, DefaultNumberGenerator::class]);
+
+// The counter-weight, and shops' own bug #19: `final class Shop` was a PHP fatal
+// the moment a host used the documented `shops.shop_model` seam. Coupon is the
+// coupons package's model, swapped through shops' own key — the same fatal is one
+// `final` away in a package this one only consumes.
+ArchPresets::swappableModelsAreNotFinal([
+    Shop::class => 'shops.shop_model',
+    Coupon::class => 'shops.discounts.coupon_model',
+]);
+
+// Shops does no cryptography of its own; the ban is a standing guard against an
+// order-number or token scheme being hand-rolled here instead of in crypto.
+ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Shops');
+
+// The two swappable models both resolve through the Support seam (ShopModel,
+// CouponModel). This is shops' bug #3 as a test: a hard-coded call site sitting
+// beside an honoured config is exactly what a stray literal outside the seam is.
+ArchPresets::modelsResolveThroughSeam(__DIR__.'/../src', 'Support');
+
+// The Dependency Policy as a test. No `alsoAllow`: shops' `require` ships only
+// php/illuminate/roundly, and the CI workflow installs test tooling with --dev, so
+// nothing legitimately lands in `require` that this must forgive.
+ArchPresets::runtimeRequireIsWhitelisted(__DIR__.'/../composer.json');
+
+ArchPresets::noDebuggingLeftovers();
+
+// ── shops-specific rules the presets don't express ────────────────────────────
 
 arch('src only uses allowed vendor roots')
     ->expect('RoundlyConsulting\Shops')
@@ -71,21 +108,4 @@ it('exposes a single public execute method on every action', function (): void {
 
         expect($names)->toBe(['execute'], "{$class} should expose only execute()");
     }
-});
-
-it('only requires whitelisted runtime dependencies', function (): void {
-    /** @var array<string, string> $require */
-    $require = json_decode((string) file_get_contents(__DIR__.'/../composer.json'), true)['require'] ?? [];
-
-    // The CI matrix injects testing tooling (orchestra/testbench, pest, …) into
-    // "require" via `composer require`; the policy only forbids third-party
-    // *runtime* dependencies, so allow whitelisted vendors plus that tooling.
-    $allowed = '#^(php$|ext-|illuminate/|laravel/|symfony/|roundly-consulting/|orchestra/|pestphp/|nunomaduro/|larastan/|phpstan/)#';
-
-    $disallowed = array_values(array_filter(
-        array_keys($require),
-        fn (string $package): bool => preg_match($allowed, $package) !== 1,
-    ));
-
-    expect($disallowed)->toBe([]);
 });
