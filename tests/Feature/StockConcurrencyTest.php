@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use RoundlyConsulting\Shops\Inventory\Actions\AdjustStockAction;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Inventory\StockAdjustment;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Tests\Fixtures\LockRecordingGrammar;
+use RoundlyConsulting\Testing\Database\DriverMatrix;
+use RoundlyConsulting\Testing\Fixtures\LockRecorder;
+use RoundlyConsulting\Testing\Fixtures\LockRecordingGrammar;
 
 /**
  * Stock is an oversell boundary: the last unit must never be sold twice, and a
@@ -24,26 +27,53 @@ use RoundlyConsulting\Shops\Tests\Fixtures\LockRecordingGrammar;
  */
 
 /**
- * Record every query that asked for a row lock, and the transaction depth it ran at.
+ * Record every query that asked for a row lock, and the transaction depth it ran at,
+ * through the shipped `LockRecorder` — on whichever engine the leg configured.
  *
- * @return list<array{sql: string, level: int}>
+ * `ProductVariant` is final and has no `*_model` config key, so the recorder's
+ * variant A (the `RecordsLocks` model trait) is unavailable here and variant B is the
+ * correct choice — exactly the "model is not subclassable" case it exists for.
+ *
+ * The two engines need opposite treatment, which is the whole reason this row adopts
+ * `DriverMatrix`:
+ *
+ *  - **SQLite** has no row locks and compiles `lockForUpdate()` to an *empty string*,
+ *    so the lock leaves no trace at all. `LockRecordingGrammar` compiles it to a
+ *    trailing comment SQLite runs and ignores, making the lock observable.
+ *  - **Postgres** emits a real `FOR UPDATE` that the engine actually enforces — no
+ *    grammar needed, and swapping a SQLite grammar onto it would be nonsense. The lock
+ *    is observed as the real thing it is.
+ *
+ * Both paths land in the same `LockRecorder`, so the assertions below are identical on
+ * both legs — and on the pgsql leg they are pinning a lock the database really takes.
+ *
+ * @return list<array{marker: string, sql: string, transactionDepth: int}>
  */
 function recordLocks(Closure $work): array
 {
     $connection = DB::connection();
-    $connection->setQueryGrammar(new LockRecordingGrammar($connection));
 
-    $locks = [];
+    LockRecorder::flush();
 
-    DB::listen(function ($query) use (&$locks): void {
-        if (str_contains($query->sql, LockRecordingGrammar::MARKER)) {
-            $locks[] = ['sql' => $query->sql, 'level' => DB::transactionLevel()];
-        }
-    });
+    if (DriverMatrix::driver() === 'sqlite') {
+        $connection->setQueryGrammar(new LockRecordingGrammar($connection));
+
+        LockRecorder::listenForMarkers();
+    } else {
+        DB::listen(static function (QueryExecuted $query): void {
+            if (str_contains(strtolower($query->sql), 'for update')) {
+                LockRecorder::record(
+                    'lock-for-update',
+                    $query->connection->transactionLevel(),
+                    $query->sql,
+                );
+            }
+        });
+    }
 
     $work();
 
-    return $locks;
+    return LockRecorder::recorded();
 }
 
 function trackedVariant(int $stock): ProductVariant
@@ -66,12 +96,16 @@ function trackedVariant(int $stock): ProductVariant
  * depends on it. Swapping it in moves this assertion from `baseline + 1` to
  * `baseline + 2` — the whole rest of the suite stays green, which is precisely why
  * this pin exists.
+ *
+ * The depth is measured relative to the caller rather than from zero. That is no
+ * longer because the suite sits inside `RefreshDatabase`'s transaction — the base case
+ * resets a real engine by dropping tables, opening no transaction, so the baseline is
+ * 0 today. It stays relative because the datum under test is "one level below whoever
+ * called", which is what `LockedUpdate` violated.
  */
 it('locks the variant row inside a transaction before the guard decides', function (): void {
     $variant = trackedVariant(5);
 
-    // The suite runs inside RefreshDatabase's own transaction, so depth is measured
-    // relative to the caller, not from zero.
     $baseline = DB::transactionLevel();
 
     $locks = recordLocks(function () use ($variant): void {
@@ -82,8 +116,9 @@ it('locks the variant row inside a transaction before the guard decides', functi
     // the caller — i.e. the action opened its own transaction and locked inside it.
     // The guard therefore decides against a locked row, never the caller's copy.
     expect($locks)->toHaveCount(1)
+        ->and($locks[0]['marker'])->toBe('lock-for-update')
         ->and($locks[0]['sql'])->toContain('product_variants')
-        ->and($locks[0]['level'])->toBe($baseline + 1);
+        ->and($locks[0]['transactionDepth'])->toBe($baseline + 1);
 });
 
 it('never sells the last unit twice', function (): void {

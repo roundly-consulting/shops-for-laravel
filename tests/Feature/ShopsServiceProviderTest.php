@@ -37,27 +37,27 @@ it('publishes the config file under the shops-config tag', function (): void {
 
 /**
  * Publish-only migrations (fleet policy). A bare `php artisan migrate` must not
- * create the package's tables — the host publishes them first.
+ * create the package's tables — the host publishes them first. Doing both runs both
+ * copies, which is a duplicate-table failure.
  */
 it('never auto-loads its migrations', function (): void {
-    expect(app('migrator')->paths())
-        ->not->toContain(realpath(__DIR__.'/../../database/migrations'));
+    expect(ShopsServiceProvider::class)->toNotAutoLoadMigrations();
 });
 
 it('publishes every migration timestamped under the shops-migrations tag', function (): void {
-    $paths = ServiceProvider::pathsToPublish(ShopsServiceProvider::class, 'shops-migrations');
+    expect(ShopsServiceProvider::class)->toPublishMigrationsTimestamped('shops-migrations', 14);
+});
 
-    expect($paths)->toHaveCount(14);
+/**
+ * Publishing preserves the dependency order the sources are numbered in, so the
+ * host's migrator runs shops → products → variants → carts → orders. That ordering
+ * is shops-specific (the `0001_`..`0014_` prefixes), so it stays a local pin.
+ */
+it('publishes the migrations in their dependency order', function (): void {
+    $destinations = array_values(
+        ServiceProvider::pathsToPublish(ShopsServiceProvider::class, 'shops-migrations')
+    );
 
-    $destinations = array_values($paths);
-
-    foreach ($destinations as $destination) {
-        expect(basename((string) $destination))
-            ->toMatch('/^\d{4}_\d{2}_\d{2}_\d{6}_\d{4}_create_[a-z_]+_table\.php$/');
-    }
-
-    // Publishing preserves the dependency order the sources are numbered in, so the
-    // host's migrator runs shops → products → variants → carts → orders.
     $sorted = $destinations;
     sort($sorted);
 
@@ -83,27 +83,23 @@ it('reports configuration without leaking host vocabulary', function (): void {
     ]);
     config()->set('shops.tax_classes', ['eu-oss-reduced' => 10, 'acme-wholesale' => 0]);
 
-    Artisan::call('about', ['--only' => 'shops']);
-
-    $rendered = Artisan::output();
-
-    // Guard the guard: an empty capture would make every assertion below vacuous.
-    expect($rendered)->toContain('Shop model')
-        ->and($rendered)->toContain('Payment gateway')
-        ->and($rendered)->toContain('2 defined')
-        // A host class is reported by base name — enough to see which gateway is
-        // wired, without publishing where it lives.
-        ->and($rendered)->toContain('LiveGateway');
-
-    expect($rendered)
-        // ...but never the namespace it sits in.
-        ->not->toContain('App\\Billing')
-        // ...nor the ledger bucket, the storage disk, the host's own field names,
-        // or its tax vocabulary.
-        ->not->toContain('acme-internal-ledger')
-        ->not->toContain('s3-private-catalog')
-        ->not->toContain('supplier_cost')
-        ->not->toContain('serial_number')
-        ->not->toContain('eu-oss-reduced')
-        ->not->toContain('acme-wholesale');
+    // The capture asserts non-empty output and every `mustRender` string BEFORE it
+    // looks for a secret — a negative-only check passes against empty output, which
+    // is how the fleet's most credential-heavy `about` section went vacuous (#13).
+    expect('shops')->toLeakNoSecrets(
+        secrets: [
+            // The namespace a host's gateway sits in (its base name is fine — enough
+            // to see which gateway is wired, without publishing where it lives).
+            'App\\Billing',
+            // The ledger bucket, the storage disk, the host's own field names, and
+            // its tax vocabulary.
+            'acme-internal-ledger',
+            's3-private-catalog',
+            'supplier_cost',
+            'serial_number',
+            'eu-oss-reduced',
+            'acme-wholesale',
+        ],
+        mustRender: ['Shop model', 'Payment gateway', '2 defined', 'LiveGateway'],
+    );
 });

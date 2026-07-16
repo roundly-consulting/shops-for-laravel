@@ -2,10 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\ServiceProvider;
-use RoundlyConsulting\Shops\ShopsServiceProvider;
 
 /**
  * The package ships fourteen CREATEs wired together by nineteen real foreign keys
@@ -13,78 +10,57 @@ use RoundlyConsulting\Shops\ShopsServiceProvider;
  * preserves the source directory's order, so that order has to be runnable end to
  * end from an empty database: every table must exist before anything references it.
  *
- * SQLite happily creates a table referencing a missing parent — it only complains at
- * insert time — so these tests are the *committed* pin, not the proof. The order was
- * proved against a real PostgreSQL server, which rejects a dangling foreign key at
- * DDL time: the pre-fix directory order died on the second file ("relation \"carts\"
- * does not exist"), the fixed order applied all fourteen with all nineteen keys, and a
- * negative control (variants before products) was watched being rejected.
- *
- * These tests run the *published* files, under their published names, into a database
- * that starts empty — which is what a host actually does.
+ * Shops shipped that order broken once (#17). SQLite never noticed — it happily
+ * creates a table referencing a missing parent and only complains at insert time —
+ * so the structural pin below is what fails on *any* engine, and the Postgres pair
+ * underneath it is what proves the pin against a database that really enforces the
+ * constraint at DDL time.
  */
-beforeEach(function (): void {
-    $this->publishedPath = sys_get_temp_dir().'/shops-migration-order-'.bin2hex(random_bytes(6));
-    $this->publishedDatabase = $this->publishedPath.'/database.sqlite';
+$migrations = __DIR__.'/../../database/migrations';
 
-    File::makeDirectory($this->publishedPath, recursive: true);
-    File::put($this->publishedDatabase, '');
-
-    foreach (ServiceProvider::pathsToPublish(ShopsServiceProvider::class, 'shops-migrations') as $source => $target) {
-        File::copy($source, $this->publishedPath.'/'.basename((string) $target));
-    }
-
-    config()->set('database.connections.published', [
-        'driver' => 'sqlite',
-        'database' => $this->publishedDatabase,
-        'prefix' => '',
-        'foreign_key_constraints' => true,
-    ]);
+/**
+ * The structural pin (M), and the one that would have caught #17 on SQLite: read
+ * every foreign key out of the migration *source* and assert each parent's CREATE
+ * sorts before the child that references it. `foreignKeys: 19` pins the edge count
+ * so the check can never pass over an empty or mis-parsed directory.
+ */
+it('creates every foreign key target before the table that references it', function () use ($migrations): void {
+    expect($migrations)->toHaveRunnableMigrationOrder(foreignKeys: 19);
 });
 
-afterEach(function (): void {
-    File::deleteDirectory($this->publishedPath);
-});
+/**
+ * The real-engine proof (R). Postgres rejects a dangling foreign key at DDL time,
+ * which is exactly the enforcement SQLite lacks: the pre-fix order died on the
+ * second file ("relation \"carts\" does not exist"). `migrations: 14` pins the file
+ * count so a relocated directory cannot pass vacuously.
+ */
+it('applies all fourteen migrations on postgres', function () use ($migrations): void {
+    expect($migrations)->toApplyOnConnection('pgsql', migrations: 14);
+})->skip(fn (): bool => ! test()->connectionAvailable('pgsql'), 'no postgres connection available');
 
-it('migrates the published files clean from an empty database', function (): void {
-    $schema = Schema::connection('published');
+/**
+ * The negative control. A green FK test proves nothing until the engine has been
+ * watched *rejecting* the broken order — otherwise the check is vacuous on any
+ * driver that does not enforce foreign keys.
+ */
+it('rejects a child-before-parent order on postgres', function () use ($migrations): void {
+    expect($migrations)->toRejectBrokenOrderOnConnection(
+        fn (array $files): array => array_reverse($files),
+        'pgsql',
+    );
+})->skip(fn (): bool => ! test()->connectionAvailable('pgsql'), 'no postgres connection available');
 
-    expect($schema->hasTable('shops'))->toBeFalse();
-
-    $this->artisan('migrate', [
-        '--database' => 'published',
-        '--path' => $this->publishedPath,
-        '--realpath' => true,
-    ])->assertExitCode(0);
-
-    $tables = [
-        'shops', 'products', 'product_categories', 'category_product',
-        'product_options', 'product_option_values', 'product_variants',
-        'product_variant_option_value', 'stock_adjustments', 'carts',
-        'cart_items', 'orders', 'order_items', 'tax_rates',
-    ];
-
-    foreach ($tables as $table) {
-        expect($schema->hasTable($table))->toBeTrue();
-    }
-});
-
-it('keeps every foreign key intact in the published schema', function (): void {
-    $this->artisan('migrate', [
-        '--database' => 'published',
-        '--path' => $this->publishedPath,
-        '--realpath' => true,
-    ])->assertExitCode(0);
-
-    $schema = Schema::connection('published');
-
+/**
+ * The CREATE order is load-bearing, not incidental: each child really does
+ * constrain onto a table created before it. This runs against whatever engine the
+ * leg configured, so the edges are pinned on SQLite and re-pinned on Postgres.
+ */
+it('keeps every foreign key intact in the migrated schema', function (): void {
     $foreignKeys = static fn (string $table): array => array_map(
         static fn (array $key): string => $key['columns'][0].' → '.$key['foreign_table'],
-        $schema->getForeignKeys($table),
+        Schema::getForeignKeys($table),
     );
 
-    // The CREATE order is load-bearing, not incidental: each child really does
-    // constrain onto a table created before it.
     expect($foreignKeys('products'))->toContain('shop_id → shops')
         ->and($foreignKeys('product_variants'))->toContain('product_id → products')
         ->and($foreignKeys('product_options'))->toContain('product_id → products')
@@ -104,50 +80,4 @@ it('keeps every foreign key intact in the published schema', function (): void {
         ->toContain('product_id → products')
         ->toContain('product_variant_id → product_variants')
         ->and($foreignKeys('tax_rates'))->toContain('shop_id → shops');
-});
-
-/**
- * The structural pin — and the one that would have caught the shipped bug on SQLite.
- *
- * Read every `constrained('parent')` out of the migration sources and assert the
- * parent's CREATE really does sort before the child's. This is engine-independent, so
- * it fails in CI (SQLite) the moment someone adds a table whose foreign key outruns
- * its target.
- */
-it('creates every foreign key target before the table that references it', function (): void {
-    $sources = glob(__DIR__.'/../../database/migrations/*.php');
-    sort($sources);
-
-    /** @var array<string, int> $createdAt */
-    $createdAt = [];
-    /** @var list<array{child: string, parent: string, at: int}> $edges */
-    $edges = [];
-
-    foreach ($sources as $position => $source) {
-        $body = (string) file_get_contents($source);
-
-        preg_match("/Schema::create\('([a-z_]+)'/", $body, $created);
-        expect($created)->not->toBeEmpty();
-
-        $createdAt[$created[1]] = $position;
-
-        preg_match_all("/->constrained\('([a-z_]+)'\)/", $body, $parents);
-
-        foreach ($parents[1] as $parent) {
-            $edges[] = ['child' => $created[1], 'parent' => $parent, 'at' => $position];
-        }
-    }
-
-    // The package really does emit the foreign keys this test is guarding.
-    expect($edges)->toHaveCount(19);
-
-    foreach ($edges as $edge) {
-        expect($createdAt)->toHaveKey($edge['parent']);
-
-        expect($createdAt[$edge['parent']])
-            ->toBeLessThan(
-                $edge['at'],
-                "{$edge['child']} references {$edge['parent']}, which must be created first",
-            );
-    }
 });
