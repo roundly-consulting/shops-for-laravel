@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Tests;
 
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Orchestra\Testbench\TestCase as Orchestra;
-use ReflectionClass;
+use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Addresses\AddressesServiceProvider;
 use RoundlyConsulting\Attributes\AttributesServiceProvider;
 use RoundlyConsulting\Coupons\CouponsServiceProvider;
@@ -17,11 +13,10 @@ use RoundlyConsulting\Credits\CreditsServiceProvider;
 use RoundlyConsulting\MediaLibrary\MediaLibraryServiceProvider;
 use RoundlyConsulting\Reviews\ReviewsServiceProvider;
 use RoundlyConsulting\Shops\ShopsServiceProvider;
+use RoundlyConsulting\Testing\PackageTestCase;
 
-abstract class TestCase extends Orchestra
+abstract class TestCase extends PackageTestCase
 {
-    use RefreshDatabase;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,9 +25,12 @@ abstract class TestCase extends Orchestra
     }
 
     /**
-     * @return array<int, class-string>
+     * Every provider shops hard-requires, in registration order. A host auto-discovers
+     * these; the suite must list them or the test environment is a fiction.
+     *
+     * @return list<class-string<ServiceProvider>>
      */
-    protected function getPackageProviders($app): array
+    protected function packageProviders(): array
     {
         return [
             MediaLibraryServiceProvider::class,
@@ -45,68 +43,49 @@ abstract class TestCase extends Orchestra
         ];
     }
 
-    protected function defineEnvironment($app): void
-    {
-        $app['config']->set('database.default', 'testing');
-        $app['config']->set('database.connections.testing', [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
-            'foreign_key_constraints' => true,
-        ]);
-
-        // Catalog media: store on a fakeable public disk with the GD driver and a small
-        // responsive ladder so variant generation stays fast under test.
-        $app['config']->set('media.disk', 'public');
-        $app['config']->set('media.image_driver', 'gd');
-        $app['config']->set('media.responsive.widths', [320, 640]);
-
-        // Coupons share the shop's single currency so the money bridge round-trips cleanly.
-        $app['config']->set('coupons.default_currency', 'EUR');
-
-        // A small product spec-sheet definition set, registered into the attributes
-        // registry at boot, plus strict mode so unknown attributes are rejected.
-        $app['config']->set('attributes.strict', true);
-        $app['config']->set('shops.attributes.definitions', [
-            'material' => ['type' => 'string'],
-            'weight' => ['type' => 'integer', 'rules' => ['min:0']],
-        ]);
-    }
-
-    protected function defineDatabaseMigrations(): void
-    {
-        $this->loadProviderSchema();
-
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-        $this->loadMigrationsFrom(__DIR__.'/database/migrations');
-
-        Schema::create('customers', function (Blueprint $table): void {
-            $table->id();
-            $table->string('name')->nullable();
-            $table->timestamps();
-        });
-    }
-
     /**
-     * Run the migrations of the provider packages the shop integrations depend on.
-     * Packages publish their migrations rather than loading them, so the suite has to
-     * run each provider's directory itself.
+     * Every provider whose migrations the suite needs, named by provider class — the
+     * packages publish rather than auto-load, so the suite runs each directory itself.
+     * Plus the host-owned fixture tables (`customers`, `plain_sluggables`).
+     *
+     * @return list<class-string<ServiceProvider>|string>
      */
-    private function loadProviderSchema(): void
+    protected function migrationSources(): array
     {
-        $providers = [
+        return [
             MediaLibraryServiceProvider::class,
             AttributesServiceProvider::class,
             CouponsServiceProvider::class,
             CreditsServiceProvider::class,
             AddressesServiceProvider::class,
             ReviewsServiceProvider::class,
+            ShopsServiceProvider::class,
+            __DIR__.'/database/migrations',
         ];
+    }
 
-        foreach ($providers as $provider) {
-            $base = dirname((string) (new ReflectionClass($provider))->getFileName(), 2);
+    /**
+     * @return array<string, mixed>
+     */
+    protected function configBeforeBoot(): array
+    {
+        return [
+            // Catalog media: store on a fakeable public disk with the GD driver and a small
+            // responsive ladder so variant generation stays fast under test.
+            'media.disk' => 'public',
+            'media.image_driver' => 'gd',
+            'media.responsive.widths' => [320, 640],
 
-            $this->loadMigrationsFrom($base.'/database/migrations');
-        }
+            // Coupons share the shop's single currency so the money bridge round-trips cleanly.
+            'coupons.default_currency' => 'EUR',
+
+            // A small product spec-sheet definition set, registered into the attributes
+            // registry at boot, plus strict mode so unknown attributes are rejected.
+            'attributes.strict' => true,
+            'shops.attributes.definitions' => [
+                'material' => ['type' => 'string'],
+                'weight' => ['type' => 'integer', 'rules' => ['min:0']],
+            ],
+        ];
     }
 }
