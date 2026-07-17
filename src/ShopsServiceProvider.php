@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Shops;
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Attributes\Registry\AttributeRegistry;
 use RoundlyConsulting\Attributes\Registry\DefinitionFactory;
+use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
@@ -29,6 +30,8 @@ use RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver;
 
 final class ShopsServiceProvider extends PackageServiceProvider
 {
+    use RegistersBlueprintMacros;
+
     public function configurePackage(Package $package): void
     {
         $package
@@ -86,6 +89,11 @@ final class ShopsServiceProvider extends PackageServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        // The orders / carts / stock-adjustments migrations key their polymorphic columns
+        // through the toolkit's `morphKey` macro, so it must exist before they run.
+        // Registration is idempotent — the toolkit guards it with `hasMacro()`.
+        $this->registerBlueprintMacros();
 
         $this->registerProductAttributes();
 

@@ -18,7 +18,7 @@ declare(strict_types=1);
  *    `escalation` key).
  */
 it('ships exactly the config keys it reads', function (): void {
-    expect(__DIR__.'/../../config/shops.php')->toSatisfyConfigContract(__DIR__.'/../../src', [
+    expect(__DIR__.'/../../config/shops.php')->toSatisfyConfigContract([__DIR__.'/../../src', __DIR__.'/../../database'], [
         // Shops reads a class-string key through two toolkit seams rather than a
         // `config()` call — `PackageServiceProvider::bindFromConfig(Contract::class,
         // 'shops.tax.resolver', …)` and `ModelResolver::for('shops.shop_model', …)`.

@@ -5,17 +5,20 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('orders', function (Blueprint $table): void {
+        $keyType = KeyType::fromConfig('shops.key_type');
+
+        Schema::create('orders', function (Blueprint $table) use ($keyType): void {
             $table->id();
             $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->unsignedBigInteger('coupon_id')->nullable()->index();
-            $table->nullableMorphs('customer');
+            $table->morphKey('customer', $keyType, nullable: true);
             $table->string('number');
             $table->string('status')->default(Status::New->value);
 

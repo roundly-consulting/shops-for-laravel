@@ -28,6 +28,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Key Type
+    |--------------------------------------------------------------------------
+    |
+    | The key type used for the polymorphic customer / owner / reference columns
+    | (orders, carts and stock adjustments). Use "uuid" or "ulid" when the models
+    | these point at use UUID/ULID primary keys, otherwise leave it as "bigint".
+    | Any unrecognized value falls back to "bigint". It is fixed when the migration
+    | first runs, so choose it before publishing the migrations.
+    |
+    | Supported: "bigint", "uuid", "ulid"
+    |
+    */
+
+    'key_type' => env('SHOPS_KEY_TYPE', 'bigint'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Pricing
     |--------------------------------------------------------------------------
     |
