@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('products', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
-            $table->json('name');
-            $table->json('slug');
-            $table->json('description')->nullable();
+            $table->jsonb('name');
+            $table->jsonb('slug');
+            $table->jsonb('description')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->softDeletes();

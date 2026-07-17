@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('shops', function (Blueprint $table): void {
             $table->id();
-            $table->json('name');
-            $table->json('slug');
+            $table->jsonb('name');
+            $table->jsonb('slug');
             $table->string('currency', 3)->nullable();
             $table->timestamps();
             $table->softDeletes();

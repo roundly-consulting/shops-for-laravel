@@ -22,8 +22,8 @@ return new class extends Migration
             // Store credit (minor units) applied to this order before the gateway charge.
             $table->integer('store_credit_applied')->nullable();
 
-            $table->json('billing_address')->nullable();
-            $table->json('shipping_address')->nullable();
+            $table->jsonb('billing_address')->nullable();
+            $table->jsonb('shipping_address')->nullable();
 
             $table->string('payment')->nullable();
             $table->string('shipping')->nullable();
