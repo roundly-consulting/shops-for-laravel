@@ -38,6 +38,13 @@ ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Shops');
 // beside an honoured config is exactly what a stray literal outside the seam is.
 ArchPresets::modelsResolveThroughSeam(__DIR__.'/../src', 'Support');
 
+// The morph-key seam, guarded. Shops' `owner` (carts), `customer` (orders) and
+// `reference` (stock_adjustments) columns migrated off raw `$table->morphs()` onto
+// `morphKey($name, KeyType::fromConfig(...))` so a uuid/ulid host can flip its whole graph
+// coherently — a hardcoded bigint id breaks those hosts on Postgres, and SQLite type
+// affinity hides it. This pin reds if any of the 14 migrations reintroduces a raw morph.
+ArchPresets::morphColumnsUseTheSeam(__DIR__.'/../database/migrations');
+
 // The Dependency Policy as a test. No `alsoAllow`: shops' `require` ships only
 // php/illuminate/roundly, and the CI workflow installs test tooling with --dev, so
 // nothing legitimately lands in `require` that this must forgive.
