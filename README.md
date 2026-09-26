@@ -10,14 +10,15 @@
 
 A production-grade e-commerce foundation for Laravel: products with variants, SKUs and
 options, a race-safe inventory ledger with stock reservations, a guarded order state machine,
-a persistent cart with one-call order placement, correct net/gross tax pricing, native
+a persistent cart with one-call order placement, exact net/gross tax pricing on
+arbitrary-precision money (orders remember their own currency), native
 per-locale translations, and payment & shipping **driver contracts**. Catalog media, product
 reviews, spec-sheet attributes, coupons, store credit, and customer address books are powered
 by sibling roundly-consulting packages (see **Integrates with**).
 
 ## Requirements
 
-- PHP 8.4+
+- PHP 8.4+ with `ext-bcmath`
 - Laravel 12.0 or 13.0
 
 ## Integrates with
@@ -27,12 +28,13 @@ dependencies):
 
 | Package | What it powers in shops |
 |---|---|
+| [`money-for-laravel`](https://github.com/roundly-consulting/money-for-laravel) | Every amount: `Money`/`Currency`, exact per-line tax (`TaxRate`), discount spreading (`DiscountAllocator`), `TaxSummary`, `AsMoney`/`AsCurrency` casts and `decimal(38,0)` money columns — one Money type shared with coupons and credits |
 | [`enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel) | Order `Status`, `PriceType` and `StockReason` get `labels()`/`options()`/`validationRule()` and other helpers |
 | [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel) | Product featured/gallery images, per-variant images, category banners (public, responsive) |
 | [`reviews-for-laravel`](https://github.com/roundly-consulting/reviews-for-laravel) | Product reviews, rating aggregates, verified-purchase gating |
 | [`attributes-for-laravel`](https://github.com/roundly-consulting/attributes-for-laravel) | Typed, filterable product spec-sheet attributes |
-| [`coupons-for-laravel`](https://github.com/roundly-consulting/coupons-for-laravel) | All coupon/discount logic (percentage, fixed, free shipping, caps, usage limits) |
-| [`credits-for-laravel`](https://github.com/roundly-consulting/credits-for-laravel) | "Pay with store credit" tender and store-credit refunds |
+| [`coupons-for-laravel`](https://github.com/roundly-consulting/coupons-for-laravel) | All coupon/discount logic (percentage in basis points, fixed, free shipping, caps, currency lock, usage limits) |
+| [`credits-for-laravel`](https://github.com/roundly-consulting/credits-for-laravel) | "Pay with store credit" tender and store-credit refunds, on a currency-denominated bucket |
 | [`addresses-for-laravel`](https://github.com/roundly-consulting/addresses-for-laravel) | Customer address book → order billing/shipping snapshot |
 | [`sluggable-for-laravel`](https://github.com/roundly-consulting/sluggable-for-laravel) | Per-locale shop/product/category slugs — unique per shop, DB-enforced, locale-aware route binding, optional SEO slug history |
 
@@ -128,7 +130,7 @@ use RoundlyConsulting\Shops\Facades\Shop;
 $order = Shop::placeOrder($cart, $placeOrderData);
 $order = Shop::transition($order, Status::Paid);
 $result = Shop::charge($order);
-$discounted = Shop::useCoupon($coupon, Money::EUR(1000));
+$discount = Shop::discountFor('WELCOME10', Money::ofMinor(1000, 'EUR')); // DiscountResult
 ```
 
 ### Query scopes & route binding
@@ -154,7 +156,7 @@ use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\Shops\CurrentShop;
 
 $shop = Shop::create(['name' => 'Acme EU', 'currency' => 'EUR']);
-$shop->currency();   // 'EUR' — the per-shop override, or the configured default when null
+$shop->currency();   // Currency (EUR) — the per-shop override, or the configured default when null
 
 // Explicit ownership always wins:
 $product = Product::create(['shop_id' => $shop->id, 'name' => 'Sparkling Water']);
@@ -220,7 +222,7 @@ key.
 ```php
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\Category;
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
 $category = Category::create(['name' => 'Beverages']);
 // $category->slug === 'beverages'
@@ -228,7 +230,7 @@ $category = Category::create(['name' => 'Beverages']);
 $product = Product::create(['name' => 'Sparkling Water']);
 $product->categories()->attach($category);
 
-$product->price; // RoundlyConsulting\Shops\Support\Money\Money — proxied from the default variant
+$product->price; // RoundlyConsulting\Money\Money — proxied from the default variant
 ```
 
 `name`, `slug`, and `description` on products and categories are **translatable**, stored as
@@ -315,15 +317,20 @@ variant**, so simple single-SKU products stay a one-liner; `$product->price` pro
 default variant's price.
 
 ```php
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
 // Add explicit variants:
+// The price cast writes the `currency` column from the Money itself.
 $small = $product->variants()->create([
-    'sku' => 'WATER-0.5L', 'price' => Money::EUR(199), 'currency' => 'EUR', 'stock' => 50,
+    'sku' => 'WATER-0.5L', 'price' => Money::ofMinor(199, 'EUR'), 'stock' => 50,
 ]);
 $large = $product->variants()->create([
-    'sku' => 'WATER-1L', 'price' => Money::EUR(299), 'currency' => 'EUR', 'stock' => 30,
+    'sku' => 'WATER-1L', 'price' => Money::ofMinor(299, 'EUR'), 'stock' => 30,
 ]);
+
+// Re-pricing in another currency: set `currency` BEFORE `price` — the cast refuses to
+// silently re-denominate a column that already holds another code (CurrencyMismatch).
+$small->update(['currency' => 'USD', 'price' => Money::ofMinor(219, 'USD')]);
 
 $product->defaultVariant;       // lowest-position variant
 $small->inStock(10);            // bool — respects track_stock and reserved quantity
@@ -367,32 +374,36 @@ an order is placed, canceling an order **releases** the hold, and fulfilling an 
 **converts** the reservation into a sale (decrementing on-hand stock). An oversell during
 reservation rolls back the whole order and holds nothing.
 
-### Money value object
+### Money
 
-`Money` is an immutable value object storing an integer amount in the currency's minor unit.
-It powers the `price` cast on products and order items, with no third-party money dependency.
+Every amount in shops is a [money-for-laravel](https://github.com/roundly-consulting/money-for-laravel)
+`RoundlyConsulting\Money\Money`: minor units as an exact integer string in a registered
+currency with its real exponent (JPY 0, EUR 2, BHD 3). Prices are `decimal(38,0)` columns
+cast with `AsMoney::currencyColumn('currency')`; carts and orders cast `currency` to a
+`Currency`. Shops ships no money primitive of its own — coupons and credits speak the same
+type, so nothing is converted between packages.
 
 ```php
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
-$price = Money::EUR(1000);                 // 10.00 EUR
-$total = Money::sum(Money::EUR(1000), Money::EUR(500)); // 1500 EUR
-$withTax = $price->multiply(120)->divide(100);          // 1200 EUR
-
-$price->getAmount();              // "1000"
-$price->getCurrency()->getCode(); // "EUR"
+$price = Money::ofMinor(1000, 'EUR');       // 10.00 EUR
+$total = Money::sum([$price, Money::ofMinor(500, 'EUR')]); // 15.00 EUR
+$price->minor();                            // "1000" (string — exact past int64)
+$price->currency()->code;                   // "EUR"
+(string) $price;                            // "10.00 EUR"
 ```
 
-Combining different currencies throws a `CurrencyMismatchException`; an invalid currency code
-throws an `InvalidCurrencyException`.
+Mixing currencies throws money's `CurrencyMismatch` — including adding a variant to a cart or
+order in another currency.
 
 ### Orders and pricing
 
 ### Cart & placing an order
 
 A `Cart` is a persistent basket with an optional polymorphic `owner` (a user) or a guest
-`token` for anonymous checkout, plus a configured currency. Add variants to it and read its
-price through the same engine orders use:
+`token` for anonymous checkout, plus its currency. Add variants to it (a variant priced in
+another currency throws `CurrencyMismatch`) and read its price through the same engine orders
+use:
 
 ```php
 use RoundlyConsulting\Shops\Cart\Cart;
@@ -424,14 +435,16 @@ Billing and shipping addresses are stored as JSON and cast to an immutable `Addr
 
 ### Orders and pricing
 
-An order has many `items`, an optional `coupon`, and an automatically generated `number`. Its
-`price` accessor returns a `Price` DTO that computes discount, shipping, tax, and the final
+An order has many `items`, an optional `coupon`, an automatically generated `number`, and its
+own **`currency`** — snapshotted when it is created (from the cart at place-order, else its
+shop's, else `SHOPS_DEFAULT_CURRENCY`), so changing the configured default never
+re-denominates historical orders. Its `price` accessor returns a `Price` DTO that computes discount, shipping, tax, and the final
 total from the order's items.
 
 ```php
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Orders\Item;
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
 $order = Order::create([]);              // number auto-generated, e.g. "24000001"
 
@@ -439,8 +452,7 @@ Item::create([
     'order_id' => $order->id,
     'name' => 'Sparkling Water',
     'quantity' => 2,
-    'price' => 199,
-    'currency' => 'EUR',
+    'price' => Money::ofMinor(199, 'EUR'), // must match the order's currency
 ]);
 
 $price = $order->price;                  // RoundlyConsulting\Shops\Orders\DataTransferObjects\Price
@@ -451,6 +463,7 @@ $price->getNetPrice();           // tax-exclusive value of the goods
 $price->getTaxPrice();           // tax across the goods (after discount)
 $price->getDiscountValue();      // amount saved by the coupon
 $price->getFinalPrice();         // amount the customer pays (goods + shipping, tax-correct)
+$price->taxSummary();            // money TaxSummary: net / tax / gross per rate (invoice VAT table)
 ```
 
 Pricing is **quantity-aware** (a 2× line is billed twice) and **tax-correct** for both
@@ -459,6 +472,13 @@ tax-inclusive and tax-exclusive catalogs. Set `shops.pricing.price_type` to `gro
 are resolved per line by the owning shop's database rates (with country awareness), falling
 back to the `tax_classes` config map; host applications can supply their own jurisdiction
 logic by binding a custom `TaxResolver`.
+
+Tax is **exact**: an order-level discount is first spread over the lines in proportion to
+their totals (money's `DiscountAllocator` — the shares sum to the discount), then each line is
+taxed once on its discounted amount with money's `TaxRate` (gross: `gross × 100 / (100 +
+rate)`; net: `net × rate`), rounding half away from zero. No floats, so a gross catalog always
+satisfies `net + tax = price after discount`, and large or exotic-exponent amounts are taxed
+exactly.
 
 ### Order status & lifecycle
 
@@ -604,13 +624,15 @@ and records the redemption at place-order:
 use RoundlyConsulting\Coupons\Facades\Coupons;
 use RoundlyConsulting\Coupons\Enums\DiscountType;
 use RoundlyConsulting\Shops\Facades\Shop;
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
-$coupon = Coupons::generate(DiscountType::Percentage, 10, 'WELCOME10');
+$coupon = Coupons::generate(DiscountType::Percentage, 1000, 'WELCOME10'); // basis points: 10 %
 $coupon->activate()->save();
 
 // Preview a discount (no redemption):
-Shop::discountFor('WELCOME10', Money::EUR(1000))->discount; // 100 EUR off
+$result = Shop::discountFor('WELCOME10', Money::ofMinor(1000, 'EUR'));
+$result->discount; // 1.00 EUR off
+$result->source;   // the coupon as a money Discount, to compose in a DiscountStack
 
 // Price a cart with a code (defaults to the cart's stored coupon_code):
 $cart->price('WELCOME10')->getFinalPrice();
@@ -621,7 +643,13 @@ coupons zero the shipping line). Swap the coupon model or resolver via `shops.di
 
 ### Pay with store credit
 
-With `credits-for-laravel`, buyers can pay all or part of an order from a store-credit bucket.
+With `credits-for-laravel`, buyers can pay all or part of an order from a store-credit bucket
+**denominated in the order's currency**. Map the bucket in `config/credits.php`:
+
+```php
+'currencies' => ['store_credit' => 'EUR'], // your shop currency; one bucket per currency
+```
+
 Enable `shops.payment.allow_store_credit` (env `SHOPS_ALLOW_STORE_CREDIT`); `ChargeOrderAction`
 then debits available credit before charging the gateway for the remainder. The bucket is
 `shops.payment.store_credit_bucket`, and refunds can be returned as store credit via
@@ -631,7 +659,14 @@ then debits available credit before charging the gateway for the remainder. The 
 use RoundlyConsulting\Shops\Payments\StoreCreditTender;
 
 $remainder = app(StoreCreditTender::class)->apply($order, $customer); // Money still owed
+$remainder = app(StoreCreditTender::class)->apply($order, $customer, Money::ofMinor(500, 'EUR')); // cap the debit
+
+$order->store_credit_applied; // ?Money, in the order currency
 ```
+
+An undenominated bucket throws `StoreCreditBucketNotDenominated` and a bucket in another
+currency `StoreCreditCurrencyMismatch` (both before any credit moves). The refund listener
+skips such a bucket with a `Log::warning()` instead — the refund has already happened.
 
 ### Customer address book
 
@@ -665,7 +700,7 @@ succeeds, and free shipping):
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
 final class StripeGateway implements PaymentGateway
 {
@@ -687,6 +722,21 @@ $quote  = app(QuoteShippingAction::class)->execute($order, $destinationAddress);
 ```
 
 A failed charge leaves the order's status unchanged.
+
+## Upgrading
+
+Shops is pre-1.0 and unreleased, so its migrations were edited in place — re-run them on a
+fresh database. Moving onto money-for-laravel changed:
+
+- Every `Money` is `RoundlyConsulting\Money\Money` (`ofMinor()`, string `minor()`); the old
+  `Support\Money` classes, `MoneyCast`, `MoneyBridge` and the three money exceptions are gone.
+- Prices and `store_credit_applied` are `decimal(38,0)`; `orders.currency` is new.
+- Tax is allocated per line after the discount (may differ by ≤ 1 minor unit per line from the
+  previous total-level ratio).
+- Store credit needs a denominated bucket: add `'currencies' => ['store_credit' => 'EUR']` to
+  `config/credits.php`.
+- Coupon percentages are basis points (`1000` = 10 %) and fixed coupons are currency-locked
+  (coupons-for-laravel).
 
 ## Testing
 
