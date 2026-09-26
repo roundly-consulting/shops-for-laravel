@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\QueryException;
 use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
 use RoundlyConsulting\Money\Money;
+use RoundlyConsulting\Shops\Cart\Cart;
+use RoundlyConsulting\Shops\Orders\Actions\AddOrderItemAction;
+use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 
@@ -90,4 +93,26 @@ it('round-trips a price beyond the old 32-bit column on every engine', function 
     ]);
 
     expect((string) $variant->refresh()->price)->toBe('99999999.99 EUR');
+});
+
+it('carries its column defaults before it is re-read from the database', function (): void {
+    $product = Product::factory()->create();
+
+    // Created without tax_class / track_stock, exactly as the README shows it.
+    $variant = $product->variants()->create([
+        'sku' => 'WATER-0.5L', 'price' => Money::ofMinor(199, 'EUR'), 'stock' => 50,
+    ]);
+
+    expect($variant->tax_class)->toBe('standard')
+        ->and($variant->track_stock)->toBeTrue()
+        ->and($variant->reserved)->toBe(0)
+        ->and($variant->inStock(51))->toBeFalse()
+        ->and($variant->availableStock())->toBe(50);
+
+    // The same in-memory instance goes straight into a cart and an order.
+    $cart = Cart::create(['currency' => 'EUR']);
+    $order = Order::factory()->create();
+
+    expect($cart->add($variant)->tax_class)->toBe('standard')
+        ->and(app(AddOrderItemAction::class)->execute($order, $variant)->tax_class)->toBe('standard');
 });

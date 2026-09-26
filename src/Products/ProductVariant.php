@@ -41,6 +41,21 @@ final class ProductVariant extends Model implements HasMedia
 
     protected $guarded = [];
 
+    /**
+     * The table's column defaults, mirrored so a just-created instance carries them too: a
+     * variant made without a `tax_class` must still be addable to a cart or an order (whose
+     * `tax_class` columns are NOT NULL), and one made without `track_stock` must be tracked.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'tax_class' => 'standard',
+        'track_stock' => true,
+        'stock' => 0,
+        'reserved' => 0,
+        'position' => 0,
+    ];
+
     protected static function newFactory(): ProductVariantFactory
     {
         return ProductVariantFactory::new();
