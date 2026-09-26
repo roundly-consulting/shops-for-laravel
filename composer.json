@@ -105,6 +105,18 @@
         },
         {
             "type": "path",
+            "url": "../sluggable-for-laravel*",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/roundly-consulting/sluggable-for-laravel",
+            "no-api": true
+        },
+        {
+            "type": "path",
             "url": "../package-toolkit-for-laravel*",
             "options": {
                 "symlink": true
@@ -138,7 +150,8 @@
         "roundly-consulting/enums-for-laravel": "@dev",
         "roundly-consulting/media-library-for-laravel": "@dev",
         "roundly-consulting/package-toolkit-for-laravel": "@dev",
-        "roundly-consulting/reviews-for-laravel": "@dev"
+        "roundly-consulting/reviews-for-laravel": "@dev",
+        "roundly-consulting/sluggable-for-laravel": "@dev"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
