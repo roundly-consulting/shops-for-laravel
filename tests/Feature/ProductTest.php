@@ -11,6 +11,7 @@ use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;
+use RoundlyConsulting\Shops\Shops\Shop;
 
 it('has relationships', function (): void {
     $product = new Product;
@@ -94,4 +95,26 @@ it('proxies its price to the default variant', function (): void {
 it('casts published_at to carbon', function (): void {
     expect(Product::factory()->unpublished()->make()->published_at)->toBeNull()
         ->and(Product::factory()->published()->make()->published_at)->toBeInstanceOf(Carbon::class);
+});
+
+it('prices a new product default variant in its shop currency', function (): void {
+    config()->set('shops.pricing.default_currency', 'EUR');
+    $shop = Shop::factory()->create(['currency' => 'USD']);
+
+    $product = Product::factory()->create(['shop_id' => $shop->id]);
+
+    // A USD shop's product must not start life as an EUR variant: its cart and orders are
+    // USD, and the money cast would refuse to re-price the variant in USD later.
+    expect($product->refresh()->defaultVariant?->price->currency()->code)->toBe('USD')
+        ->and($product->price->currency()->code)->toBe('USD');
+
+    $product->defaultVariant?->update(['price' => Money::ofMinor('1500', 'USD')]);
+
+    expect($product->refresh()->price->minor())->toBe('1500');
+});
+
+it('prices a shop-less product default variant in the default currency', function (): void {
+    config()->set('shops.pricing.default_currency', 'EUR');
+
+    expect(Product::factory()->create()->defaultVariant?->price->currency()->code)->toBe('EUR');
 });

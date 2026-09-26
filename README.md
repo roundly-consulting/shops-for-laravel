@@ -313,8 +313,8 @@ Adding a locale later works the same way: `sluggable:regenerate … --locale=de`
 
 Every sellable unit is a `ProductVariant` with its own `sku`, `price`, `currency`, tax class,
 and stock. A product created without explicit variants automatically gets **one default
-variant**, so simple single-SKU products stay a one-liner; `$product->price` proxies the
-default variant's price.
+variant** (a zero price in its shop's currency), so simple single-SKU products stay a
+one-liner; `$product->price` proxies the default variant's price.
 
 ```php
 use RoundlyConsulting\Money\Money;

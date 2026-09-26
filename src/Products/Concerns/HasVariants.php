@@ -9,8 +9,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\ProductVariant;
+use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
 
 /**
@@ -79,8 +81,8 @@ trait HasVariants
 
     /**
      * Read-only proxy to the default variant's price so simple products keep a
-     * single `price` read. Falls back to a zero amount in the configured
-     * currency when the product has no variant yet (e.g. before it is saved).
+     * single `price` read. Falls back to a zero amount in the product's currency
+     * when the product has no variant yet (e.g. before it is saved).
      *
      * @return Attribute<Money, never>
      */
@@ -90,7 +92,7 @@ trait HasVariants
             $variant = $this->variants()->orderBy('position')->orderBy('id')->first();
 
             if ($variant === null) {
-                return Money::zero((string) config('shops.pricing.default_currency', 'EUR'));
+                return Money::zero($this->catalogCurrency());
             }
 
             return $variant->price;
@@ -111,8 +113,21 @@ trait HasVariants
         $this->variants()->create([
             'sku' => $this->defaultVariantSku(),
             'name' => null,
-            'price' => Money::zero((string) config('shops.pricing.default_currency', 'EUR')),
+            'price' => Money::zero($this->catalogCurrency()),
         ]);
+    }
+
+    /**
+     * The currency this product is sold in: its shop's (a shop may override the default),
+     * else `shops.pricing.default_currency`.
+     */
+    protected function catalogCurrency(): Currency
+    {
+        $shop = $this->getAttribute('shop_id') !== null ? $this->getAttribute('shop') : null;
+
+        return $shop instanceof Shop
+            ? $shop->currency()
+            : Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
     }
 
     /**
