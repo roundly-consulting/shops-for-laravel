@@ -370,6 +370,10 @@ app(AdjustStockAction::class)->execute($variant, 100, StockReason::Received);   
 app(AdjustStockAction::class)->execute($variant, -1, StockReason::Sold, $order); // sell one
 ```
 
+The sign must match the reason — `Received`, `Returned` and `Reserved` add (positive),
+`Sold` and `Released` remove (negative), `Manual` goes either way — and a zero delta is
+refused; both throw `InvalidQuantityException` before anything is written.
+
 Selling below available stock on a `track_stock` variant throws `InsufficientStockException`;
 variants with `track_stock = false` (digital/unlimited goods) never throw. Every adjustment
 fires `StockAdjusted`, and crossing `shops.inventory.low_stock_threshold` fires `StockRanLow`.
@@ -411,6 +415,7 @@ another currency throws `CurrencyMismatch`) and read its price through the same 
 use:
 
 ```php
+use RoundlyConsulting\Shops\Cart\Actions\UpdateCartItem;
 use RoundlyConsulting\Shops\Cart\Cart;
 
 $cart = Cart::create(['currency' => 'EUR']);
@@ -418,7 +423,17 @@ $cart->add($variant, quantity: 2);   // snapshots name/sku/price; same variant i
 
 $cart->subtotal();   // Money
 $cart->price();      // Price DTO (pass a coupon to discount it)
+
+app(UpdateCartItem::class)->execute($item, 3); // set a line's quantity
+app(UpdateCartItem::class)->execute($item, 0); // 0 removes the line (returns null)
 ```
+
+A quantity is a whole number of items from 1 to 32 767 (`Support\Quantity::MAX`, the range of
+the quantity columns). Anything else — zero or negative in `add()` / `AddToCart` /
+`AddOrderItemAction`, negative in `UpdateCartItem`, a fraction, or a line that would grow past
+the maximum — throws `RoundlyConsulting\Shops\Exceptions\InvalidQuantityException` before
+anything is written. `CartItem` and order `Item` guard their `quantity` on every write too
+(integer strings such as request input are accepted), and a `PriceLine` needs at least one item.
 
 `PlaceOrderAction` turns a cart into an order in one transaction — snapshotting each line,
 reserving stock, linking a coupon by code, storing the billing/shipping address, generating the
@@ -477,6 +492,12 @@ $price->getDiscountValue();      // amount saved by the placed discount
 $price->getFinalPrice();         // amount the customer pays (goods + shipping, tax-correct)
 $price->taxSummary();            // money TaxSummary: net / tax / gross per rate (invoice VAT table)
 ```
+
+`$order->price` is computed once per model instance and cached, together with its loaded
+`items`: after changing an order in memory (adding items, applying a discount) call
+`$order->refresh()` before reading the price again — and before charging it, since
+`ChargeOrderAction` and `StoreCreditTender` charge the price they read. `PlaceOrderAction`
+already hands back a refreshed order.
 
 Pricing is **quantity-aware** (a 2× line is billed twice) and **tax-correct** for both
 tax-inclusive and tax-exclusive catalogs. Set `shops.pricing.price_type` to `gross`
