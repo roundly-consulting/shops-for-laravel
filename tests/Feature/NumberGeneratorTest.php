@@ -165,4 +165,4 @@ it('numbers two orders placed at the same time differently', function (): void {
 
     expect($first?->number)->toBe('23000001')
         ->and($outcome)->toBe('numbered 23000002');
-})->skip(fn (): bool => DriverMatrix::driver() !== 'pgsql' || ! function_exists('pcntl_fork'), 'needs a real engine and a second process');
+})->skip(fn (): bool => DriverMatrix::driver() !== 'pgsql', 'needs a real engine (and pcntl + posix for the second process)');
