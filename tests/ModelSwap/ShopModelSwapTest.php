@@ -37,6 +37,14 @@ it('honours a host tenant model through the whole shop flow', function (): void 
     });
 });
 
+it('generates a slug on a host tenant model through the inherited sluggable trait', function (): void {
+    $shop = CustomShop::query()->create(['name' => ['en' => 'Acme EU']]);
+
+    expect($shop->slugMap())->toBe(['en' => 'acme-eu'])
+        ->and($shop->getRouteKeyName())->toBe('slug')
+        ->and(CustomShop::findBySlug('acme-eu')?->is($shop))->toBeTrue();
+});
+
 // The structural half of both seams — non-final, and the config default really points
 // at the packaged model — is pinned once in tests/ArchTest.php by
 // `ArchPresets::swappableModelsAreNotFinal()`. It deliberately does NOT live here:

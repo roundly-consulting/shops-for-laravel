@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use RoundlyConsulting\Sluggable\DataTransferObjects\SlugIndexSpec;
+use RoundlyConsulting\Sluggable\Schema\SlugIndexes;
 
 return new class extends Migration
 {
@@ -14,11 +16,14 @@ return new class extends Migration
             $table->id();
             $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->jsonb('name');
-            $table->jsonb('slug');
+            $table->localizedSlug('slug');
             $table->jsonb('description')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
+
+        // Unique per shop and locale; trashed products keep their slug reserved.
+        SlugIndexes::ensure(SlugIndexSpec::localeMap('products', 'slug', scope: ['shop_id']));
     }
 };

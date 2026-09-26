@@ -20,8 +20,9 @@ use RoundlyConsulting\Shops\Shops\Shop;
  * the toolkit's is-a-Model validation is exactly this key's contract, and a
  * non-Shop model must be honoured rather than quietly replaced.
  *
- * A host that wants the package's own tenant behaviour (translations, slugs, tax
- * rates, `Shop::current()`) extends {@see Shop} instead.
+ * A host that wants the package's own tenant behaviour (translations, tax rates,
+ * `Shop::current()`, and the sluggable-backed slug + route key it inherits)
+ * extends {@see Shop} instead.
  */
 final class ShopModel
 {

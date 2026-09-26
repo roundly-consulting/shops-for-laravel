@@ -67,6 +67,7 @@ arch('src only uses allowed vendor roots')
         'RoundlyConsulting\MediaLibrary',
         'RoundlyConsulting\PackageToolkit',
         'RoundlyConsulting\Reviews',
+        'RoundlyConsulting\Sluggable',
         'Illuminate',
         'Carbon',
         'Closure',

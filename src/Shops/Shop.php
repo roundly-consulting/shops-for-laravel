@@ -10,11 +10,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
-use RoundlyConsulting\Shops\Concerns\HasSlug;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\ShopFactory;
+use RoundlyConsulting\Shops\Products\Category;
+use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Support\ShopModel;
+use RoundlyConsulting\Sluggable\Concerns\HasSlug;
+use RoundlyConsulting\Sluggable\Contracts\Sluggable;
+use RoundlyConsulting\Sluggable\Definitions\SlugDefinition;
+use RoundlyConsulting\Sluggable\Definitions\SlugOptions;
 
 /**
  * The concrete tenant a shop-owned record belongs to. Every owned model
@@ -34,8 +39,10 @@ use RoundlyConsulting\Shops\Support\ShopModel;
  * @property string $slug
  * @property string|null $currency
  * @property-read Collection<int, TaxRate> $taxRates
+ * @property-read Collection<int, Product> $products
+ * @property-read Collection<int, Category> $categories
  */
-class Shop extends Model implements Translatable
+class Shop extends Model implements Sluggable, Translatable
 {
     /** @use HasFactory<ShopFactory> */
     use HasFactory;
@@ -61,6 +68,23 @@ class Shop extends Model implements Translatable
     }
 
     /**
+     * One locale-map slug from `name`, unique across all shops per locale, and the
+     * route key — `/shops/{shop}` binds by the current-locale slug.
+     */
+    public function slugOptions(): SlugOptions
+    {
+        return SlugOptions::make(
+            SlugDefinition::for('slug')
+                ->from('name')
+                ->localized()
+                ->unique()
+                ->fallbackLocale(fn (): string => (string) config('shops.locales.fallback', 'en'))
+                ->keepHistory((bool) config('shops.slugs.history', false))
+                ->routeKey(),
+        );
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -69,6 +93,28 @@ class Shop extends Model implements Translatable
             'name' => 'array',
             'slug' => 'array',
         ];
+    }
+
+    /**
+     * The shop's catalog. Also what `->scopeBindings()` walks for
+     * `/shops/{shop}/products/{product}`.
+     *
+     * @return HasMany<Product, $this>
+     */
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class, 'shop_id');
+    }
+
+    /**
+     * The shop's categories; the scoped-binding relation for
+     * `/shops/{shop}/categories/{category}`.
+     *
+     * @return HasMany<Category, $this>
+     */
+    public function categories(): HasMany
+    {
+        return $this->hasMany(Category::class, 'shop_id');
     }
 
     /**

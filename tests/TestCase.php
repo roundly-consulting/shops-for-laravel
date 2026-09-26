@@ -13,6 +13,7 @@ use RoundlyConsulting\Credits\CreditsServiceProvider;
 use RoundlyConsulting\MediaLibrary\MediaLibraryServiceProvider;
 use RoundlyConsulting\Reviews\ReviewsServiceProvider;
 use RoundlyConsulting\Shops\ShopsServiceProvider;
+use RoundlyConsulting\Sluggable\SluggableServiceProvider;
 use RoundlyConsulting\Testing\PackageTestCase;
 
 abstract class TestCase extends PackageTestCase
@@ -39,6 +40,7 @@ abstract class TestCase extends PackageTestCase
             CreditsServiceProvider::class,
             AddressesServiceProvider::class,
             ReviewsServiceProvider::class,
+            SluggableServiceProvider::class,
             ShopsServiceProvider::class,
         ];
     }
@@ -46,7 +48,8 @@ abstract class TestCase extends PackageTestCase
     /**
      * Every provider whose migrations the suite needs, named by provider class — the
      * packages publish rather than auto-load, so the suite runs each directory itself.
-     * Plus the host-owned fixture tables (`customers`, `plain_sluggables`).
+     * Plus the host-owned fixture table (`customers`). Sluggable's own source is
+     * its `slug_history` table, which the history-redirect tests need.
      *
      * @return list<class-string<ServiceProvider>|string>
      */
@@ -59,6 +62,7 @@ abstract class TestCase extends PackageTestCase
             CreditsServiceProvider::class,
             AddressesServiceProvider::class,
             ReviewsServiceProvider::class,
+            SluggableServiceProvider::class,
             ShopsServiceProvider::class,
             __DIR__.'/database/migrations',
         ];
@@ -86,6 +90,11 @@ abstract class TestCase extends PackageTestCase
                 'material' => ['type' => 'string'],
                 'weight' => ['type' => 'integer', 'rules' => ['min:0']],
             ],
+
+            // Two indexed slug locales, so the per-locale unique indexes the shops
+            // migrations create are exercised beyond the app locale.
+            'sluggable.locales.supported' => ['en', 'sk'],
+            'sluggable.locales.fallback' => 'en',
         ];
     }
 }

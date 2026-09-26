@@ -100,6 +100,6 @@ it('reports configuration without leaking host vocabulary', function (): void {
             'eu-oss-reduced',
             'acme-wholesale',
         ],
-        mustRender: ['Shop model', 'Payment gateway', '2 defined', 'LiveGateway'],
+        mustRender: ['Shop model', 'Payment gateway', '2 defined', 'LiveGateway', 'Slug history'],
     );
 });

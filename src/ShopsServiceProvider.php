@@ -64,6 +64,7 @@ final class ShopsServiceProvider extends PackageServiceProvider
                     NullVerifiedPurchaseResolver::class,
                 ),
                 'Fallback locale' => (string) config('shops.locales.fallback', 'en'),
+                'Slug history' => (bool) config('shops.slugs.history', false) ? 'ON' : 'OFF',
             ]);
     }
 

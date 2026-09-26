@@ -9,9 +9,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Str;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Sluggable\Contracts\Sluggable;
 
 /**
  * Gives a product one-to-many variants (its sellable units), an implicit
@@ -19,6 +19,8 @@ use RoundlyConsulting\Shops\Support\Money\Money;
  * proxy to that default variant for back-compat reads.
  *
  * @phpstan-require-extends Model
+ *
+ * @phpstan-require-implements Sluggable
  *
  * @property-read Collection<int, ProductVariant> $variants
  * @property-read ProductVariant|null $defaultVariant
@@ -115,8 +117,16 @@ trait HasVariants
         ]);
     }
 
+    /**
+     * Derived from the fallback-locale slug, so the same product gets the same SKU
+     * whatever locale the request that created it ran under.
+     */
     protected function defaultVariantSku(): string
     {
-        return mb_strtoupper(Str::slug((string) $this->getAttribute('slug')).'-DEFAULT');
+        $slug = $this->slugFor((string) config('shops.locales.fallback', 'en'))
+            ?? $this->currentSlug()
+            ?? (string) $this->getKey();
+
+        return mb_strtoupper($slug.'-DEFAULT');
     }
 }

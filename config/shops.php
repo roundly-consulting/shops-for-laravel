@@ -191,6 +191,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Slugs (sluggable)
+    |--------------------------------------------------------------------------
+    |
+    | Shop, product and category slugs come from
+    | roundly-consulting/sluggable-for-laravel: one slug per locale, unique
+    | across shops (shops) or within a shop (products, categories), and used
+    | as the route key. The indexed locales are sluggable's
+    | "sluggable.locales.supported".
+    |
+    | "history" keeps every retired slug so an old URL answers with a 301 to
+    | the current one. It needs sluggable's published slug_history migration.
+    |
+    */
+
+    'slugs' => [
+        'history' => env('SHOPS_SLUG_HISTORY', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Payment
     |--------------------------------------------------------------------------
     |
