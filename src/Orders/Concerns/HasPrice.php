@@ -63,6 +63,25 @@ trait HasPrice
         });
     }
 
+    /**
+     * The share of the final price settled through the payment gateway: the final price
+     * minus any store credit already applied, never below zero. It is what a gateway's
+     * `charge()` takes, and the most a gateway refund can return.
+     */
+    public function gatewayAmount(): Money
+    {
+        /** @var Price $price */
+        $price = $this->getAttribute('price');
+        $final = $price->getFinalPrice();
+        $credit = $this->getAttribute('store_credit_applied');
+
+        if (! $credit instanceof Money) {
+            return $final;
+        }
+
+        return Money::max([Money::zero($final->currency()), $final->subtract($credit)]);
+    }
+
     private function resolveShop(): ?Shop
     {
         if ($this->getAttribute('shop_id') === null) {

@@ -14,7 +14,15 @@ use RoundlyConsulting\Shops\Payments\PaymentResult;
  */
 interface PaymentGateway
 {
+    /**
+     * Charge `$order->gatewayAmount()` — the final price minus any store credit already
+     * applied. ChargeOrderAction never calls this for a zero balance.
+     */
     public function charge(Order $order): PaymentResult;
 
+    /**
+     * Refund `$amount` (at most `$order->gatewayAmount()`). The package never calls this
+     * itself: refunds are host-driven — refund through the gateway, then `$order->refund()`.
+     */
     public function refund(Order $order, Money $amount): PaymentResult;
 }

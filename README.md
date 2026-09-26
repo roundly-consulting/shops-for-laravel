@@ -657,7 +657,9 @@ With `credits-for-laravel`, buyers can pay all or part of an order from a store-
 ```
 
 Enable `shops.payment.allow_store_credit` (env `SHOPS_ALLOW_STORE_CREDIT`); `ChargeOrderAction`
-then debits available credit before charging the gateway for the remainder. The bucket is
+then debits available credit before charging the gateway for the remainder
+(`$order->gatewayAmount()`) — an order credit covers in full is marked paid without a gateway
+charge. The bucket is
 `shops.payment.store_credit_bucket`, and refunds can be returned as store credit via
 `shops.payment.refund_to_store_credit`.
 
@@ -710,6 +712,7 @@ use RoundlyConsulting\Money\Money;
 
 final class StripeGateway implements PaymentGateway
 {
+    // Charge $order->gatewayAmount(): the total minus any store credit already applied.
     public function charge(Order $order): PaymentResult { /* … */ }
     public function refund(Order $order, Money $amount): PaymentResult { /* … */ }
 }
@@ -727,7 +730,19 @@ $result = app(ChargeOrderAction::class)->execute($order); // PaymentResult
 $quote  = app(QuoteShippingAction::class)->execute($order, $destinationAddress); // Money
 ```
 
-A failed charge leaves the order's status unchanged.
+A failed charge leaves the order's status unchanged. A zero balance (store credit covered the
+order, or it is free) skips the gateway and succeeds with a zero amount.
+
+Refunds are **host-driven**: the package never calls the gateway's `refund()`. Refund through
+your gateway (at most `$order->gatewayAmount()`), then transition the order:
+
+```php
+$result = app(PaymentGateway::class)->refund($order, $order->gatewayAmount());
+
+if ($result->successful) {
+    $order->refund(); // → Refunded, fires OrderRefunded (store-credit credit-back if enabled)
+}
+```
 
 ## Upgrading
 

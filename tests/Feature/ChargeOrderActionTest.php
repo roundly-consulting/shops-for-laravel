@@ -6,6 +6,7 @@ use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
 use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
+use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
@@ -44,6 +45,7 @@ it('leaves the status unchanged when the gateway fails', function (): void {
     });
 
     $order = Order::factory()->create();
+    Item::factory()->for($order)->withEurPrice('1000')->create();
 
     $result = app(ChargeOrderAction::class)->execute($order);
 

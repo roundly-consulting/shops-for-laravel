@@ -217,6 +217,9 @@ return [
     | "gateway" is the class charging and refunding orders. It must implement
     | RoundlyConsulting\Shops\Contracts\PaymentGateway. The package ships only a
     | null gateway that always succeeds; bind your own vendor implementation.
+    | ChargeOrderAction charges only $order->gatewayAmount() (the total minus
+    | store credit) and skips the gateway for a zero balance. Refunds are
+    | host-driven: the package never calls the gateway's refund() itself.
     |
     */
 
