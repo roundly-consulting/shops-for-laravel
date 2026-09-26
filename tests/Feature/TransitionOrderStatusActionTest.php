@@ -101,3 +101,21 @@ it('forbids transitions out of a terminal status', function (): void {
     expect(fn () => app(TransitionOrderStatusAction::class)->execute($order, Status::Paid))
         ->toThrow(IllegalStatusTransitionException::class);
 });
+
+it('refuses a transition decided on a stale copy of the order', function (): void {
+    Event::fake([OrderRefunded::class]);
+
+    $order = Order::factory()->paid()->create();
+
+    // Two requests loaded the paid order; the first refunds it.
+    $sameOrderElsewhere = Order::query()->findOrFail($order->getKey());
+    $order->refund();
+
+    // The second still sees "Paid" in memory, but the order is Refunded: refunding it again
+    // would fire OrderRefunded twice (and credit the refund back twice).
+    expect(fn () => $sameOrderElsewhere->refund())
+        ->toThrow(IllegalStatusTransitionException::class)
+        ->and($order->refresh()->status)->toBe(Status::Refunded);
+
+    Event::assertDispatchedTimes(OrderRefunded::class, 1);
+});
