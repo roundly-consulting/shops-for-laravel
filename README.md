@@ -101,7 +101,11 @@ return [
 
     'orders' => [
         'number_generator' => DefaultNumberGenerator::class,
-        'coupon_model' => env('SHOPS_COUPON_MODEL'),
+    ],
+
+    'discounts' => [
+        'coupon_model' => env('SHOPS_COUPON_MODEL', \RoundlyConsulting\Coupons\Models\Coupon::class),
+        'resolver' => \RoundlyConsulting\Shops\Discounts\CouponPackageDiscountResolver::class,
     ],
 ];
 ```
@@ -110,12 +114,13 @@ return [
 |---|---|---|---|---|
 | `shop_model` | `class-string` | `Shops\Shop::class` | `SHOPS_SHOP_MODEL` | The Eloquent tenant model every owned record points at via its `shop_id` foreign key. Swap in your own model to extend it. |
 | `pricing.price_type` | `string` | `gross` | `SHOPS_PRICE_TYPE` | `gross` (tax is extracted from the stored price) or `net` (tax is added on top). |
-| `pricing.default_currency` | `string` | `EUR` | `SHOPS_DEFAULT_CURRENCY` | ISO-4217 currency every cart and order uses. |
+| `pricing.default_currency` | `string` | `EUR` | `SHOPS_DEFAULT_CURRENCY` | ISO-4217 fallback currency: for a shop without its own `currency`, an order without a shop, and a shop-less product's default variant. Carts carry their own currency and orders snapshot theirs. |
 | `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. |
 | `tax.resolver` | `class-string` | `DatabaseTaxResolver::class` | — | Resolves the rate for a `(shop, class, country)` lookup. Defaults to per-shop database rates with the config map as the floor. Bind `ConfigTaxResolver` to use only the config map, or your own `TaxResolver`. |
 | `orders.number_generator` | `class-string` | `DefaultNumberGenerator::class` | — | The class used to generate an order number. Must implement `NumberGenerator`. |
 | `slugs.history` | `bool` | `false` | `SHOPS_SLUG_HISTORY` | Keep retired shop/product/category slugs and answer old URLs with a 301 to the current one. Needs sluggable's published `slug_history` migration. |
-| `orders.coupon_model` | `class-string\|null` | `null` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation. Must implement the `Coupon` contract. Leave `null` if you do not use coupons. |
+| `discounts.coupon_model` | `class-string` | coupons' `Coupon::class` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation: coupons-for-laravel's `Coupon` or your subclass of it (anything else falls back to `Coupon`). |
+| `discounts.resolver` | `class-string` | `CouponPackageDiscountResolver::class` | — | The `DiscountResolver` pricing carts and snapshotting an order's discount at place-order. |
 
 ## Usage
 
@@ -201,10 +206,10 @@ $shop->taxRates()->create([
 ]);
 
 $value = app(TaxResolver::class)->rateFor($shop, 'reduced', 'LU');
-$value->percent();        // 8.5
-$value->basisPoints;      // 850
-$value->grossDivisor();   // 1.085
-$value->isZero();         // false
+$value->basisPoints;                 // 850
+$value->percentage()->value();       // "8.5" — money's Percentage
+$value->toTaxRate();                 // money's TaxRate, which does the exact tax math
+$value->isZero();                    // false
 
 app(TaxResolver::class)->rateFor($shop, 'standard');   // shop's default standard rate
 app(TaxResolver::class)->rateFor(null, 'standard');    // config floor (2000 bp = 20%)
