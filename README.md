@@ -527,7 +527,8 @@ your application can listen to.
 ### Order numbers
 
 By default order numbers are `<two-digit year><6-digit sequence>` (e.g. `24000001`),
-sequenced per year and counting soft-deleted orders. Provide your own strategy by
+sequenced per year and counting soft-deleted orders. A number is assigned once, when the order
+is first inserted (unless you set one) — never when orders are loaded. Provide your own strategy by
 implementing `NumberGenerator` and pointing `shops.orders.number_generator` at it:
 
 ```php

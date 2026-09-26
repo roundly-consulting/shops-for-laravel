@@ -78,8 +78,9 @@ final class Order extends Model
     /**
      * Snapshot the currency on insert when none was set: the order's shop's (or the bound
      * current shop's), else the configured default. A placed order keeps it even when
-     * SHOPS_DEFAULT_CURRENCY changes later. Done here rather than in a `creating` listener
-     * so it holds under `Event::fake()` too — the column is NOT NULL.
+     * SHOPS_DEFAULT_CURRENCY changes later. Then assign the order number (unless set).
+     * Done here rather than in a `creating` listener so both hold under `Event::fake()`
+     * too — the columns are NOT NULL.
      *
      * @param  Builder<static>  $query
      */
@@ -89,6 +90,8 @@ final class Order extends Model
             $this->currency = $this->resolveShopForCurrency()?->currency()
                 ?? Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
         }
+
+        $this->assignNumber();
 
         return parent::performInsert($query);
     }
