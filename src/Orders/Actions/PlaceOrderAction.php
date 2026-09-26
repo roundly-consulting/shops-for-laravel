@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Shops\Orders\Actions;
 
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Coupons\CouponManager;
+use RoundlyConsulting\Coupons\Exceptions\CouponNotRedeemable;
 use RoundlyConsulting\Shops\Cart\Actions\ClearCart;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
@@ -87,7 +88,9 @@ final class PlaceOrderAction
      * Link and redeem the coupon for the order's goods subtotal, snapshotting the
      * discount it grants onto the order. The discount is resolved *before* redemption,
      * while the coupon is still redeemable — a single-use coupon is exhausted by this
-     * very redemption. A missing or non-redeemable coupon is silently skipped so it
+     * very redemption, which runs under the coupon's row lock and has the final say: a
+     * coupon it refuses (a racing checkout took the last use) is skipped like any other
+     * non-redeemable one. A missing or non-redeemable coupon is silently skipped so it
      * never blocks checkout.
      */
     private function redeemCoupon(Order $order, ?string $code): void
@@ -111,12 +114,19 @@ final class PlaceOrderAction
 
         $discount = $this->discounts->resolve($code, $price);
 
+        try {
+            $coupon->redeemBy($redeemer, $price);
+        } catch (CouponNotRedeemable) {
+            // The check above ran without the coupon's lock: a racing checkout may have used
+            // the last redemption since. The locked redemption is the arbiter — skip the
+            // coupon (its savepoint rolled back) rather than fail the whole checkout.
+            return;
+        }
+
         $order->coupon()->associate($coupon);
         $order->discount = $discount->discount;
         $order->free_shipping = $discount->freeShipping;
         $order->coupon_code = $coupon->code;
         $order->save();
-
-        $coupon->redeemBy($redeemer, $price);
     }
 }

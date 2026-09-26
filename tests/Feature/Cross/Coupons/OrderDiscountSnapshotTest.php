@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Coupons\Models\Coupon;
 use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Cart\Cart;
+use RoundlyConsulting\Shops\Contracts\DiscountResolver;
+use RoundlyConsulting\Shops\Discounts\CouponPackageDiscountResolver;
+use RoundlyConsulting\Shops\Discounts\DiscountResult;
 use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
 use RoundlyConsulting\Shops\Orders\Actions\PlaceOrderAction;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
@@ -184,4 +187,32 @@ it('hands order-placed listeners the discounted price', function (): void {
     placeDiscountedOrder('ONCE');
 
     expect($seen)->toBe('750');
+});
+
+it('places the order without the coupon when a racing checkout used it up first', function (): void {
+    $coupon = Coupon::factory()->percentage(1000)->active()->create(['code' => 'LAST', 'max_usage' => 1]);
+
+    // Another checkout redeems the last use after this one checked the coupon but before it
+    // redeemed it — the window between the unlocked eligibility check and the locked redemption.
+    app()->bind(DiscountResolver::class, fn (): DiscountResolver => new class implements DiscountResolver
+    {
+        public function resolve(string $code, Money $goods): DiscountResult
+        {
+            $result = app(CouponPackageDiscountResolver::class)->resolve($code, $goods);
+            Coupon::query()->where('code', $code)->firstOrFail()->redeemBy(null, $goods);
+
+            return $result;
+        }
+    });
+
+    $order = placeDiscountedOrder('LAST');
+
+    // A coupon that turns out not to be redeemable is skipped — the order is placed at the
+    // full price with no discount snapshot, never half-discounted, and checkout goes through.
+    expect($order->exists)->toBeTrue()
+        ->and($order->discount)->toBeNull()
+        ->and($order->coupon_code)->toBeNull()
+        ->and($order->coupon_id)->toBeNull()
+        ->and($order->price->getFinalPrice()->minor())->toBe('1000')
+        ->and($coupon->refresh()->usage)->toBe(1);
 });
