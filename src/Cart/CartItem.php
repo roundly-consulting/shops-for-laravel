@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Money\Casts\AsMoney;
 use RoundlyConsulting\Money\Money;
+use RoundlyConsulting\Shops\Concerns\HasQuantity;
 use RoundlyConsulting\Shops\Database\Factories\CartItemFactory;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 
@@ -30,6 +31,7 @@ final class CartItem extends Model
 {
     /** @use HasFactory<CartItemFactory> */
     use HasFactory;
+    use HasQuantity;
     use SoftDeletes;
 
     protected $table = 'cart_items';

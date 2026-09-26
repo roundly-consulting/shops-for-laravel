@@ -17,11 +17,13 @@ use RoundlyConsulting\Shops\Cart\Concerns\HasOwner;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Database\Factories\CartFactory;
+use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\Support\Quantity;
 
 /**
  * @property int $id
@@ -70,10 +72,13 @@ final class Cart extends Model
      * Add a variant to the cart, snapshotting its price/sku and incrementing the
      * quantity when the same variant is already present.
      *
+     * @throws InvalidQuantityException when the quantity (or the merged line) is not 1..Quantity::MAX.
      * @throws CurrencyMismatch when the variant is priced in another currency than the cart.
      */
     public function add(ProductVariant $variant, int $quantity = 1): CartItem
     {
+        Quantity::assertValid($quantity);
+
         if (! $variant->price->currency()->equals($this->currency)) {
             throw CurrencyMismatch::between($this->currency, $variant->price->currency());
         }
@@ -81,6 +86,9 @@ final class Cart extends Model
         $existing = $this->items()->where('product_variant_id', $variant->id)->first();
 
         if ($existing !== null) {
+            // The merged line must still be a valid quantity (the model guard refuses it too).
+            Quantity::assertValid($existing->quantity + $quantity);
+
             $existing->increment('quantity', $quantity);
 
             return $existing->refresh();

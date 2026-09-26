@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Orders\Actions;
 
 use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
+use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\ProductVariant;
+use RoundlyConsulting\Shops\Support\Quantity;
 
 /**
  * Adds a variant to an order as a line item, snapshotting the variant's
@@ -18,10 +20,13 @@ use RoundlyConsulting\Shops\Products\ProductVariant;
 final class AddOrderItemAction
 {
     /**
+     * @throws InvalidQuantityException when the quantity is not 1..Quantity::MAX.
      * @throws CurrencyMismatch when the variant is priced in another currency than the order.
      */
     public function execute(Order $order, ProductVariant $variant, int $quantity = 1): Item
     {
+        Quantity::assertValid($quantity);
+
         if (! $variant->price->currency()->equals($order->currency)) {
             throw CurrencyMismatch::between($order->currency, $variant->price->currency());
         }

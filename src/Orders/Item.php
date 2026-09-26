@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Money\Casts\AsMoney;
 use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
+use RoundlyConsulting\Shops\Concerns\HasQuantity;
 use RoundlyConsulting\Shops\Database\Factories\ItemFactory;
 use RoundlyConsulting\Shops\Orders\Concerns\BelongsToOrder;
 use RoundlyConsulting\Shops\Orders\Concerns\BelongsToVariant;
@@ -36,6 +37,7 @@ final class Item extends Model
     use BelongsToVariant;
     /** @use HasFactory<ItemFactory> */
     use HasFactory;
+    use HasQuantity;
     use SoftDeletes;
 
     protected $table = 'order_items';

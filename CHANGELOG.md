@@ -35,3 +35,11 @@ All notable changes to `shops-for-laravel` will be documented in this file.
 - Placed orders keep their tax: `AddOrderItemAction` snapshots each line's resolved rate
   (`order_items.tax_rate` + `tax_label`) and orders snapshot `price_type`, so later rate edits,
   address changes or a price-type flip no longer re-price them (a net order's total included).
+- Quantities are validated (`InvalidQuantityException`): `Cart::add()`, `AddToCart` and
+  `AddOrderItemAction` refuse zero, negative and oversized (> 32 767) quantities, including a
+  merged cart line that would shrink or overflow; `UpdateCartItem` still removes a line set to
+  `0` but refuses a negative quantity (it used to remove it); `CartItem` / `Item` refuse an
+  invalid `quantity` on any write (fractions included); `PriceLine` needs at least one item.
+  They used to produce zero or negative totals.
+- `AdjustStockAction` refuses a zero delta and a delta whose sign contradicts its reason
+  (`StockReason::direction()`): receiving −5 used to remove stock and selling +1 to add it.

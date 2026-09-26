@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Inventory\Actions;
 
 use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 use RoundlyConsulting\Shops\Inventory\Events\StockAdjusted;
 use RoundlyConsulting\Shops\Inventory\Events\StockRanLow;
@@ -14,7 +15,10 @@ use RoundlyConsulting\Shops\Products\ProductVariant;
 
 /**
  * Applies a signed stock delta to a variant inside a row-locked transaction,
- * writing an auditable ledger row. A negative delta that would breach available
+ * writing an auditable ledger row. The sign must match the reason
+ * ({@see StockReason::direction()}: received/returned/reserved add, sold/released remove,
+ * manual either way) and a zero delta is refused — both throw
+ * {@see InvalidQuantityException} before anything is written. A negative delta that would breach available
  * stock on a tracked variant throws {@see InsufficientStockException}; untracked
  * variants never throw and only record the ledger row.
  */
@@ -27,6 +31,8 @@ final class AdjustStockAction
         ?Model $reference = null,
         ?string $note = null,
     ): StockAdjustment {
+        $this->assertDirection($delta, $reason);
+
         return $variant->getConnection()->transaction(function () use ($variant, $delta, $reason, $reference, $note): StockAdjustment {
             /** @var ProductVariant $locked */
             $locked = $variant->newQuery()->lockForUpdate()->findOrFail($variant->getKey());
@@ -43,6 +49,22 @@ final class AdjustStockAction
 
             return $adjustment;
         });
+    }
+
+    /**
+     * @throws InvalidQuantityException when the delta is zero or its sign contradicts the reason.
+     */
+    private function assertDirection(int $delta, StockReason $reason): void
+    {
+        if ($delta === 0) {
+            throw InvalidQuantityException::zeroDelta($reason);
+        }
+
+        $direction = $reason->direction();
+
+        if ($direction !== 0 && ($delta <=> 0) !== $direction) {
+            throw InvalidQuantityException::wrongSign($reason, $delta);
+        }
     }
 
     private function applyDelta(ProductVariant $variant, int $delta, StockReason $reason): void
