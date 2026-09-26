@@ -34,6 +34,7 @@ dependencies):
 | [`coupons-for-laravel`](https://github.com/roundly-consulting/coupons-for-laravel) | All coupon/discount logic (percentage, fixed, free shipping, caps, usage limits) |
 | [`credits-for-laravel`](https://github.com/roundly-consulting/credits-for-laravel) | "Pay with store credit" tender and store-credit refunds |
 | [`addresses-for-laravel`](https://github.com/roundly-consulting/addresses-for-laravel) | Customer address book → order billing/shipping snapshot |
+| [`sluggable-for-laravel`](https://github.com/roundly-consulting/sluggable-for-laravel) | Per-locale shop/product/category slugs — unique per shop, DB-enforced, locale-aware route binding, optional SEO slug history |
 
 See `docs/cross-package-integration-plan.md` for the org-wide tier map. Coupon logic now lives
 entirely in `coupons-for-laravel`; shops no longer ships its own coupon model.
@@ -64,6 +65,12 @@ required step, not an optional one. The fourteen files publish in dependency ord
 products → variants → carts → orders), so a single `php artisan migrate` applies them cleanly.
 The six provider packages shops builds on (media-library, reviews, attributes, coupons, credits,
 addresses) publish their own migrations the same way — publish each before migrating.
+Sluggable's only migration (`sluggable-migrations`, the `slug_history` table) is needed just when
+you turn on `shops.slugs.history`.
+
+The shops, products and categories migrations create one unique slug index **per supported
+locale** — set `sluggable.locales.supported` (e.g. `['en', 'sk']`) before migrating; it defaults
+to your `app.locale` + `app.fallback_locale`. See [Slugs & URLs](#slugs--urls).
 
 ## Configuration
 
@@ -105,6 +112,7 @@ return [
 | `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. |
 | `tax.resolver` | `class-string` | `DatabaseTaxResolver::class` | — | Resolves the rate for a `(shop, class, country)` lookup. Defaults to per-shop database rates with the config map as the floor. Bind `ConfigTaxResolver` to use only the config map, or your own `TaxResolver`. |
 | `orders.number_generator` | `class-string` | `DefaultNumberGenerator::class` | — | The class used to generate an order number. Must implement `NumberGenerator`. |
+| `slugs.history` | `bool` | `false` | `SHOPS_SLUG_HISTORY` | Keep retired shop/product/category slugs and answer old URLs with a 301 to the current one. Needs sluggable's published `slug_history` migration. |
 | `orders.coupon_model` | `class-string\|null` | `null` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation. Must implement the `Coupon` contract. Leave `null` if you do not use coupons. |
 
 ## Usage
@@ -132,7 +140,8 @@ Product::query()->forShop($shop);       // filter by a Shop model or a raw shop 
 ProductVariant::query()->inStock(2);    // variants with >= 2 available (or untracked)
 ```
 
-Orders are route-bound by their `number`; products, categories and shops by their `slug`.
+Orders are route-bound by their `number`; products, categories and shops by their per-locale
+`slug` (see [Slugs & URLs](#slugs--urls)).
 
 ### Shops (tenancy)
 
@@ -239,6 +248,64 @@ $product->getTranslations('name');      // ['en' => '...', 'sk' => '...']
 ```
 
 Slugs are generated per locale from the name's translations.
+
+### Slugs & URLs
+
+Shop, product and category slugs are powered by
+[`sluggable-for-laravel`](https://github.com/roundly-consulting/sluggable-for-laravel). Each model
+stores one slug per locale in its `slug` column and uses it as the route key:
+
+| Model | Unique | Example |
+|---|---|---|
+| `Shop` | across all shops, per locale | `acme`, `acme-2` |
+| `Product` | within its shop, per locale | two shops may both sell `chair`; a second "Chair" in one shop is `chair-2` |
+| `Category` | within its shop, per locale | same as products |
+
+- **Generated per locale** from `name`: `['en' => 'Chair', 'sk' => 'Stolička']` →
+  `['en' => 'chair', 'sk' => 'stolicka']`.
+- **Enforced by the database** — the migrations add a unique index per supported locale (scoped
+  by `shop_id` on products and categories), so even a race or a raw insert cannot duplicate one.
+  Soft-deleted rows keep their slug reserved, so a restore never collides.
+- **Manual slugs** are normalised and made unique (`'Custom Slug!'` → `custom-slug`); a locale
+  added later is filled in on the next save; an empty name gets a random slug.
+- **Route binding** matches the request locale, then `shops.locales.fallback`, then any locale —
+  and works on every database engine, including tenant-scoped routes:
+
+```php
+Route::get('/shops/{shop}/products/{product}', ShowProduct::class)->scopeBindings();
+// /shops/acme/products/chair — another shop's "chair" is a 404
+```
+
+Every sluggable reader and scope is available on the three models:
+
+```php
+$product->currentSlug();              // "stolicka" under sk
+$product->slugFor('en');              // "chair"
+$product->slugMap();                  // ['en' => 'chair', 'sk' => 'stolicka']
+Product::query()->forShop($shop)->whereSlug('chair')->first();
+```
+
+The default variant's SKU derives from the **fallback-locale** slug (`CHAIR-DEFAULT`), so it is
+the same whatever locale the creating request ran under.
+
+**Slug history (opt-in).** Set `SHOPS_SLUG_HISTORY=true` and publish sluggable's migration
+(`php artisan vendor:publish --tag="sluggable-migrations"`) — renamed products keep answering
+their old URL with a 301 to the new one.
+
+**Upgrading an existing database.** Earlier builds did not enforce unique slugs, and a database
+that already ran the shops migrations has no slug indexes yet. Per model (`Shops\Shop`,
+`Products\Product`, `Products\Category`): find duplicates, preview and apply the rewrite, then add
+the indexes:
+
+```bash
+php artisan sluggable:duplicates "RoundlyConsulting\Shops\Products\Product"
+php artisan sluggable:regenerate "RoundlyConsulting\Shops\Products\Product" --mode=all --dry-run
+php artisan sluggable:regenerate "RoundlyConsulting\Shops\Products\Product" --mode=all
+php artisan sluggable:indexes "RoundlyConsulting\Shops\Products\Product"
+```
+
+Adding a locale later works the same way: `sluggable:regenerate … --locale=de` backfills it and
+`sluggable:indexes` adds its index.
 
 ### Variants, SKUs and options
 
