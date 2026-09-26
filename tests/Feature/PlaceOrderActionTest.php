@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Coupons\Models\Coupon;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Orders\Actions\PlaceOrderAction;
@@ -22,7 +23,7 @@ beforeEach(function (): void {
 
 it('links and redeems a coupon by code and copies the cart shop', function (): void {
     $shop = Shop::factory()->create();
-    $coupon = Coupon::factory()->percentage(10)->active()->create(['code' => 'WELCOME10']);
+    $coupon = Coupon::factory()->percentage(1000)->active()->create(['code' => 'WELCOME10']);
 
     $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 10]);
     $cart = Cart::factory()->create(['coupon_code' => 'WELCOME10', 'shop_id' => $shop->id]);
@@ -37,7 +38,7 @@ it('links and redeems a coupon by code and copies the cart shop', function (): v
 
 it('records the coupon redemption against the buyer', function (): void {
     $customer = Customer::create(['name' => 'Ada']);
-    Coupon::factory()->percentage(10)->active()->create(['code' => 'WELCOME10']);
+    Coupon::factory()->percentage(1000)->active()->create(['code' => 'WELCOME10']);
 
     $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 10]);
     $cart = Cart::factory()->create(['coupon_code' => 'WELCOME10']);
@@ -51,7 +52,7 @@ it('records the coupon redemption against the buyer', function (): void {
 });
 
 it('skips a non-redeemable coupon', function (): void {
-    Coupon::factory()->percentage(10)->expired()->create(['code' => 'GONE']);
+    Coupon::factory()->percentage(1000)->expired()->create(['code' => 'GONE']);
 
     $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 10]);
     $cart = Cart::factory()->create(['coupon_code' => 'GONE']);
@@ -140,4 +141,15 @@ it('places an order with no addresses and the default data', function (): void {
 
     expect($order->billing_address)->toBeNull()
         ->and($order->items()->count())->toBe(1);
+});
+
+it('snapshots the cart currency onto the order', function (): void {
+    $variant = ProductVariant::factory()->create(['currency' => 'USD', 'price' => Money::ofMinor(1000, 'USD'), 'stock' => 5]);
+    $cart = Cart::factory()->create(['currency' => 'USD']);
+    $cart->add($variant);
+
+    $order = app(PlaceOrderAction::class)->execute($cart);
+
+    expect($order->currency->code)->toBe('USD')
+        ->and((string) $order->price->getSubtotal())->toBe('10.00 USD');
 });

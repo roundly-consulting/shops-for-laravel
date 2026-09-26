@@ -7,12 +7,12 @@ namespace RoundlyConsulting\Shops\Orders;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Money\Casts\AsMoney;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Database\Factories\ItemFactory;
 use RoundlyConsulting\Shops\Orders\Concerns\BelongsToOrder;
 use RoundlyConsulting\Shops\Orders\Concerns\BelongsToVariant;
-use RoundlyConsulting\Shops\Support\Casts\MoneyCast;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @property int $id
@@ -52,7 +52,7 @@ final class Item extends Model
     {
         return [
             'quantity' => 'int',
-            'price' => MoneyCast::class,
+            'price' => AsMoney::currencyColumn('currency'),
         ];
     }
 }

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Support\Tax;
 
+use RoundlyConsulting\Money\Percentage;
+use RoundlyConsulting\Money\Tax\TaxRate;
+
 /**
- * An immutable resolved tax rate. Rates are stored as integer basis points
- * (1 basis point = 0.01%), keeping the same exact-integer discipline the package
- * uses for money: 19% is 1900, 8.5% is 850, 0% is 0.
+ * An immutable resolved tax rate with its shop context (tax class, country, label). Rates
+ * are integer basis points (1 bp = 0.01 %): 19 % is 1900, 8.5 % is 850, 0 % is 0. The tax
+ * math itself is money-for-laravel's exact {@see TaxRate}.
  */
 final readonly class TaxRateValue
 {
@@ -23,21 +26,15 @@ final readonly class TaxRateValue
         return new self(0, $taxClass);
     }
 
-    /**
-     * The percentage as a float, e.g. 19.0 or 8.5.
-     */
-    public function percent(): float
+    /** The money TaxRate that computes tax on net / in gross amounts exactly. */
+    public function toTaxRate(): TaxRate
     {
-        return $this->basisPoints / 100;
+        return TaxRate::fromBasisPoints($this->basisPoints, $this->label);
     }
 
-    /**
-     * The divisor used to extract net from a gross (tax-inclusive) amount:
-     * 1 + rate, e.g. 1.19 for 19% or 1.085 for 8.5%.
-     */
-    public function grossDivisor(): float
+    public function percentage(): Percentage
     {
-        return 1 + ($this->basisPoints / 10000);
+        return Percentage::fromBasisPoints($this->basisPoints);
     }
 
     public function isZero(): bool

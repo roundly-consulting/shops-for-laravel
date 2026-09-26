@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
@@ -126,15 +127,15 @@ class Shop extends Model implements Sluggable, Translatable
     }
 
     /**
-     * This shop's ISO-4217 currency, falling back to the package default when no
-     * per-shop override is set.
+     * This shop's currency (resolved through money's registry), falling back to the
+     * package default when no per-shop override is set.
      */
-    public function currency(): string
+    public function currency(): Currency
     {
         /** @var string|null $currency */
         $currency = $this->getAttribute('currency');
 
-        return $currency ?? (string) config('shops.pricing.default_currency', 'EUR');
+        return Currency::of($currency ?? (string) config('shops.pricing.default_currency', 'EUR'));
     }
 
     /**

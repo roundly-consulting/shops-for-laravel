@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Shops\CurrentShop;
@@ -22,7 +23,8 @@ it('creates a shop with translatable name, slug, and a route key', function (): 
 it('returns the per-shop currency override when set', function (): void {
     $shop = Shop::factory()->currency('USD')->create();
 
-    expect($shop->currency())->toBe('USD');
+    expect($shop->currency())->toBeInstanceOf(Currency::class)
+        ->and($shop->currency()->code)->toBe('USD');
 });
 
 it('falls back to the configured default currency when no override is set', function (): void {
@@ -30,7 +32,8 @@ it('falls back to the configured default currency when no override is set', func
 
     $shop = Shop::factory()->create(['currency' => null]);
 
-    expect($shop->currency())->toBe('GBP');
+    expect($shop->currency())->toBeInstanceOf(Currency::class)
+        ->and($shop->currency()->code)->toBe('GBP');
 });
 
 it('resolves the configured model class and honours an override', function (): void {

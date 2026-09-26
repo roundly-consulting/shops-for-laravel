@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\QueryException;
+use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 it('belongs to a product', function (): void {
     expect((new ProductVariant)->product())->toBeInstanceOf(BelongsTo::class);
@@ -17,8 +18,8 @@ it('casts price to a money object', function (): void {
 
     expect($variant->price)
         ->toBeInstanceOf(Money::class)
-        ->getAmount()->toBe('1500')
-        ->getCurrency()->getCode()->toBe('EUR');
+        ->minor()->toBe('1500')
+        ->currency()->code->toBe('EUR');
 });
 
 it('enforces sku uniqueness within a product', function (): void {
@@ -65,4 +66,28 @@ it('scopes a query to in-stock variants', function (): void {
     expect($ids)->toContain($available->id)
         ->and($ids)->toContain($untracked->id)
         ->and($ids)->not->toContain($depleted->id);
+});
+
+it('refuses to re-denominate a price without changing the currency first', function (): void {
+    $variant = ProductVariant::factory()->withEurPrice('1500')->create();
+
+    expect(fn () => $variant->update(['price' => Money::ofMinor(1500, 'USD')]))
+        ->toThrow(CurrencyMismatch::class);
+});
+
+it('re-denominates a price when the currency is set first', function (): void {
+    $variant = ProductVariant::factory()->withEurPrice('1500')->create();
+
+    $variant->update(['currency' => 'USD', 'price' => Money::ofMinor(1700, 'USD')]);
+
+    expect((string) $variant->refresh()->price)->toBe('17.00 USD');
+});
+
+it('round-trips a price beyond the old 32-bit column on every engine', function (): void {
+    $variant = ProductVariant::factory()->create([
+        'currency' => 'EUR',
+        'price' => Money::ofMajor('99999999.99', 'EUR'),
+    ]);
+
+    expect((string) $variant->refresh()->price)->toBe('99999999.99 EUR');
 });

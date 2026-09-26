@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders\Actions;
 
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Contracts\ShippingMethod;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\Order;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * Quotes shipping cost for an order to a destination through the configured

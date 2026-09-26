@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->morphKey('owner', $keyType, nullable: true);
             $table->string('token')->nullable()->unique();
-            $table->string('currency');
+            $table->currencyCode('currency');
             $table->string('coupon_code')->nullable();
             $table->timestamps();
             $table->softDeletes();

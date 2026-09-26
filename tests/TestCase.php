@@ -11,6 +11,7 @@ use RoundlyConsulting\Attributes\AttributesServiceProvider;
 use RoundlyConsulting\Coupons\CouponsServiceProvider;
 use RoundlyConsulting\Credits\CreditsServiceProvider;
 use RoundlyConsulting\MediaLibrary\MediaLibraryServiceProvider;
+use RoundlyConsulting\Money\MoneyServiceProvider;
 use RoundlyConsulting\Reviews\ReviewsServiceProvider;
 use RoundlyConsulting\Shops\ShopsServiceProvider;
 use RoundlyConsulting\Sluggable\SluggableServiceProvider;
@@ -34,6 +35,7 @@ abstract class TestCase extends PackageTestCase
     protected function packageProviders(): array
     {
         return [
+            MoneyServiceProvider::class,
             MediaLibraryServiceProvider::class,
             AttributesServiceProvider::class,
             CouponsServiceProvider::class,
@@ -80,8 +82,11 @@ abstract class TestCase extends PackageTestCase
             'media.image_driver' => 'gd',
             'media.responsive.widths' => [320, 640],
 
-            // Coupons share the shop's single currency so the money bridge round-trips cleanly.
+            // Coupons share the shop's single currency (one money-for-laravel Money type).
             'coupons.default_currency' => 'EUR',
+
+            // Store credit pays orders, so its bucket is denominated in the shop currency.
+            'credits.currencies' => ['store_credit' => 'EUR'],
 
             // A small product spec-sheet definition set, registered into the attributes
             // registry at boot, plus strict mode so unknown attributes are rejected.

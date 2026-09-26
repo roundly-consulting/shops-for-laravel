@@ -19,8 +19,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('sku')->nullable();
             $table->smallInteger('quantity')->default(1);
-            $table->integer('price');
-            $table->string('currency');
+            $table->money('price', currency: 'currency'); // decimal(38,0) + currency code
             $table->string('tax_class')->default('standard');
             $table->timestamps();
             $table->softDeletes();

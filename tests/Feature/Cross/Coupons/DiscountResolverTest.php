@@ -3,22 +3,23 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Coupons\Models\Coupon;
-use RoundlyConsulting\Coupons\ValueObjects\Money as CouponsMoney;
+use RoundlyConsulting\Money\Discounts\Discount;
+use RoundlyConsulting\Money\Enums\DiscountTarget;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Discounts\CouponPackageDiscountResolver;
-use RoundlyConsulting\Shops\Discounts\MoneyBridge;
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Shops\Discounts\DiscountResult;
 
 it('binds the coupons-backed resolver by default', function (): void {
     expect(app(DiscountResolver::class))->toBeInstanceOf(CouponPackageDiscountResolver::class);
 });
 
 it('resolves a percentage discount', function (): void {
-    Coupon::factory()->percentage(25)->active()->create(['code' => 'QUARTER']);
+    Coupon::factory()->percentage(2500)->active()->create(['code' => 'QUARTER']);
 
-    $result = app(DiscountResolver::class)->resolve('QUARTER', Money::EUR(1000));
+    $result = app(DiscountResolver::class)->resolve('QUARTER', Money::ofMinor(1000, 'EUR'));
 
-    expect($result->discount->getAmount())->toBe('250')
+    expect($result->discount->minor())->toBe('250')
         ->and($result->found)->toBeTrue()
         ->and($result->freeShipping)->toBeFalse();
 });
@@ -26,53 +27,74 @@ it('resolves a percentage discount', function (): void {
 it('resolves a fixed discount', function (): void {
     Coupon::factory()->fixed(300)->active()->create(['code' => 'TENNER']);
 
-    $result = app(DiscountResolver::class)->resolve('TENNER', Money::EUR(1000));
+    $result = app(DiscountResolver::class)->resolve('TENNER', Money::ofMinor(1000, 'EUR'));
 
-    expect($result->discount->getAmount())->toBe('300');
+    expect($result->discount->minor())->toBe('300');
 });
 
 it('reports free shipping for a free-shipping coupon', function (): void {
     Coupon::factory()->freeShipping()->active()->create(['code' => 'FREESHIP']);
 
-    $result = app(DiscountResolver::class)->resolve('FREESHIP', Money::EUR(1000));
+    $result = app(DiscountResolver::class)->resolve('FREESHIP', Money::ofMinor(1000, 'EUR'));
 
     expect($result->freeShipping)->toBeTrue()
-        ->and($result->discount->getAmount())->toBe('0');
+        ->and($result->discount->minor())->toBe('0');
 });
 
 it('caps the discount via the coupon max_discount', function (): void {
-    Coupon::factory()->percentage(50)->active()->create(['code' => 'CAPPED', 'max_discount' => 200]);
+    Coupon::factory()->cappedPercentage(5000, Money::ofMinor(200, 'EUR'))->active()->create(['code' => 'CAPPED']);
 
-    $result = app(DiscountResolver::class)->resolve('CAPPED', Money::EUR(1000));
+    $result = app(DiscountResolver::class)->resolve('CAPPED', Money::ofMinor(1000, 'EUR'));
 
-    expect($result->discount->getAmount())->toBe('200');
+    expect($result->discount->minor())->toBe('200');
 });
 
 it('returns a not-found result for an unknown code', function (): void {
-    $result = app(DiscountResolver::class)->resolve('NOPE', Money::EUR(1000));
+    $result = app(DiscountResolver::class)->resolve('NOPE', Money::ofMinor(1000, 'EUR'));
 
     expect($result->found)->toBeFalse()
         ->and($result->hasDiscount())->toBeFalse();
 });
 
 it('yields a zero discount for a non-redeemable coupon', function (): void {
-    Coupon::factory()->percentage(10)->expired()->create(['code' => 'OLD']);
+    Coupon::factory()->percentage(1000)->expired()->create(['code' => 'OLD']);
 
-    $result = app(DiscountResolver::class)->resolve('OLD', Money::EUR(1000));
+    $result = app(DiscountResolver::class)->resolve('OLD', Money::ofMinor(1000, 'EUR'));
 
     expect($result->found)->toBeTrue()
-        ->and($result->discount->getAmount())->toBe('0');
+        ->and($result->discount->minor())->toBe('0');
 });
 
-it('round-trips money across the bridge', function (): void {
-    $bridge = new MoneyBridge;
+it('shares one money type with coupons, so a yen coupon discounts a yen cart', function (): void {
+    Coupon::factory()->fixed(300, 'JPY')->active()->create(['code' => 'YEN']);
 
-    $coupons = $bridge->toCoupons(Money::EUR(1234));
-    expect($coupons)->toBeInstanceOf(CouponsMoney::class)
-        ->and($coupons->getAmount())->toBe(1234)
-        ->and($coupons->getCurrency())->toBe('EUR');
+    $result = app(DiscountResolver::class)->resolve('YEN', Money::ofMinor(1200, 'JPY'));
 
-    $shops = $bridge->toShops(new CouponsMoney(1234, 'EUR'));
-    expect($shops->getMinorAmount())->toBe(1234)
-        ->and($shops->getCurrency()->getCode())->toBe('EUR');
+    expect($result->discount)->toBeInstanceOf(Money::class)
+        ->and((string) $result->discount)->toBe('300 JPY');
+});
+
+it('yields a zero discount in the goods currency for a coupon locked to another currency', function (): void {
+    Coupon::factory()->fixed(300, 'EUR')->active()->create(['code' => 'EURO']);
+
+    $result = app(DiscountResolver::class)->resolve('EURO', Money::ofMinor(1200, 'JPY'));
+
+    expect($result->found)->toBeTrue()
+        ->and((string) $result->discount)->toBe('0 JPY')
+        ->and($result->source)->toBeNull();
+});
+
+it('exposes the coupon as a money discount for stacking', function (): void {
+    Coupon::factory()->percentage(1250)->active()->create(['code' => 'EIGHTH']);
+    Coupon::factory()->freeShipping()->active()->create(['code' => 'SHIP']);
+
+    $percent = app(DiscountResolver::class)->resolve('EIGHTH', Money::ofMinor(999, 'EUR'));
+    $shipping = app(DiscountResolver::class)->resolve('SHIP', Money::ofMinor(999, 'EUR'));
+
+    expect($percent->discount->minor())->toBe('125')
+        ->and($percent->source)->toBeInstanceOf(Discount::class)
+        ->and($percent->source?->label())->toBe('EIGHTH')
+        ->and($percent->source?->percent()?->value())->toBe('12.5')
+        ->and($shipping->source?->target())->toBe(DiscountTarget::Shipping)
+        ->and(DiscountResult::none('EUR')->source)->toBeNull();
 });

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\Product;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @extends Factory<Product>
@@ -32,8 +32,8 @@ final class ProductFactory extends Factory
     {
         return $this->afterCreating(function (Product $product) use ($price, $currency): void {
             $product->defaultVariant?->update([
-                'price' => Money::of($price, $currency),
                 'currency' => $currency,
+                'price' => Money::ofMinor($price, $currency),
             ]);
         });
     }

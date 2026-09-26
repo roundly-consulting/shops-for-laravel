@@ -4,26 +4,31 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders\DataTransferObjects;
 
+use RoundlyConsulting\Money\Currency;
+use RoundlyConsulting\Money\Discounts\DiscountAllocator;
+use RoundlyConsulting\Money\Money;
+use RoundlyConsulting\Money\Tax\TaxBreakdown;
+use RoundlyConsulting\Money\Tax\TaxSummary;
 use RoundlyConsulting\Shops\Contracts\TaxResolver;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Shops\Shop;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
- * Quantity-aware, precision-correct price calculation for a set of lines.
+ * Quantity-aware, exact price calculation for a set of lines, on money-for-laravel.
  *
- * Each {@see PriceLine} is taxed per line at its tax class's rate. For the
- * `gross` price type the tax is *extracted* from the (tax-inclusive) line
- * price; for the `net` price type the tax is *added on top*. Lines are summed,
- * then any resolved discount and shipping are applied. The discount is supplied
- * pre-computed (see DiscountResolver, backed by coupons-for-laravel) so this
- * value object stays free of coupon logic. Free-shipping coupons zero the
- * shipping line. All arithmetic stays in minor units and rounds half-up at the
- * line level.
+ * The resolved discount (see DiscountResolver, backed by coupons-for-laravel) is capped at
+ * the subtotal and spread over the lines in proportion to their totals with money's
+ * {@see DiscountAllocator} (the shares sum to the discount exactly). Each line is then taxed
+ * once, on its discounted amount, at its tax class's rate: for the `gross` price type the
+ * tax is *extracted* from the tax-inclusive amount (`gross × 100 / (100 + rate)`, exact),
+ * for `net` it is *added on top*. One rounding per line, half away from zero; no floats.
+ * Free-shipping coupons zero the shipping line.
  */
 final readonly class Price
 {
     private TaxResolver $taxResolver;
+
+    private Currency $currency;
 
     /**
      * @param  list<PriceLine>  $lines
@@ -35,11 +40,12 @@ final readonly class Price
         ?TaxResolver $taxResolver = null,
         public ?Money $discount = null,
         public bool $freeShipping = false,
-        private string $currency = 'EUR',
+        Currency|string $currency = 'EUR',
         private ?Shop $shop = null,
         private ?string $country = null,
     ) {
         $this->taxResolver = $taxResolver ?? app(TaxResolver::class);
+        $this->currency = $currency instanceof Currency ? $currency : Currency::of($currency);
     }
 
     /**
@@ -48,7 +54,7 @@ final readonly class Price
      */
     public function getSubtotal(): Money
     {
-        return $this->sumLines();
+        return Money::sum($this->lineTotals(), currencyIfEmpty: $this->currency);
     }
 
     /**
@@ -65,23 +71,25 @@ final readonly class Price
     }
 
     /**
-     * Total tax across all goods, after discount. Shipping is treated as
-     * untaxed by this default engine (a host can override via the resolver).
+     * Total tax across all goods, after discount: the sum of each line's tax on its
+     * discounted amount. Shipping is treated as untaxed by this default engine.
      */
     public function getTaxPrice(): Money
     {
-        $catalog = $this->sumLines();
-        $tax = $this->sumLineTax();
+        return Money::sum(
+            array_map(static fn (TaxBreakdown $line): Money => $line->tax, $this->breakdowns()),
+            currencyIfEmpty: $this->currency,
+        );
+    }
 
-        if ($catalog->isZero()) {
-            return $tax;
-        }
-
-        // Scale the catalog tax by the discount ratio so a coupon reduces the
-        // tax proportionally to the value it removed.
-        $ratio = $this->getPriceAfterDiscount()->getMinorAmount() / $catalog->getMinorAmount();
-
-        return $tax->multiply($ratio);
+    /**
+     * Net, tax and gross of the discounted goods grouped by rate — the VAT summary an
+     * invoice prints. Built from the same per-line breakdowns as {@see self::getTaxPrice()},
+     * so the two always agree.
+     */
+    public function taxSummary(): TaxSummary
+    {
+        return TaxSummary::of(...$this->breakdowns());
     }
 
     /**
@@ -91,15 +99,13 @@ final readonly class Price
      */
     public function getPriceAfterDiscount(): Money
     {
-        $subtotal = $this->sumLines();
+        $subtotal = $this->getSubtotal();
 
         if ($this->discount === null || ! $this->discount->isPositive()) {
             return $subtotal;
         }
 
-        $capped = $this->discount->compareTo($subtotal) >= 0 ? $subtotal : $this->discount;
-
-        return $subtotal->subtract($capped);
+        return $subtotal->subtract(Money::min([$this->discount, $subtotal]));
     }
 
     /**
@@ -107,7 +113,7 @@ final readonly class Price
      */
     public function getDiscountValue(): Money
     {
-        return $this->sumLines()->subtract($this->getPriceAfterDiscount());
+        return $this->getSubtotal()->subtract($this->getPriceAfterDiscount());
     }
 
     /**
@@ -133,60 +139,44 @@ final readonly class Price
     public function shippingCost(): Money
     {
         if ($this->freeShipping) {
-            return Money::zero($this->shipping->getCurrency()->getCode());
+            return Money::zero($this->shipping->currency());
         }
 
         return $this->shipping;
     }
 
-    private function sumLines(): Money
+    /**
+     * @return list<Money>
+     */
+    private function lineTotals(): array
     {
-        if ($this->lines === []) {
-            return Money::zero($this->currency);
-        }
-
-        $total = Money::zero($this->lines[0]->unitPrice->getCurrency()->getCode());
-
-        foreach ($this->lines as $line) {
-            $total = $total->add($line->lineTotal());
-        }
-
-        return $total;
+        return array_map(static fn (PriceLine $line): Money => $line->lineTotal(), $this->lines);
     }
 
-    private function sumLineTax(): Money
+    /**
+     * One tax breakdown per line, on the line total minus its share of the discount.
+     *
+     * @return list<TaxBreakdown>
+     */
+    private function breakdowns(): array
     {
         if ($this->lines === []) {
-            return Money::zero($this->currency);
+            return [];
         }
 
-        $total = Money::zero($this->lines[0]->unitPrice->getCurrency()->getCode());
+        $totals = $this->lineTotals();
+        $shares = app(DiscountAllocator::class)->allocate($this->getDiscountValue(), ...$totals);
+        $breakdowns = [];
 
-        foreach ($this->lines as $line) {
-            $total = $total->add($this->taxForLine($line));
+        foreach ($this->lines as $index => $line) {
+            $taxable = $totals[$index]->subtract($shares[$index]);
+            $rate = $this->taxResolver->rateFor($this->shop, $line->taxClass, $this->country)->toTaxRate();
+
+            $breakdowns[] = $this->priceType === PriceType::Gross
+                ? $rate->breakdownFromGross($taxable)
+                : $rate->breakdownFromNet($taxable);
         }
 
-        return $total;
-    }
-
-    private function taxForLine(PriceLine $line): Money
-    {
-        $rate = $this->taxResolver->rateFor($this->shop, $line->taxClass, $this->country);
-        $lineTotal = $line->lineTotal();
-
-        if ($rate->isZero()) {
-            return Money::zero($lineTotal->getCurrency()->getCode());
-        }
-
-        if ($this->priceType === PriceType::Gross) {
-            // Extract the tax already baked into a gross price:
-            // net = gross / (1 + rate); tax = gross - net.
-            $net = $lineTotal->divide($rate->grossDivisor());
-
-            return $lineTotal->subtract($net);
-        }
-
-        // Net price: add the tax on top.
-        return $lineTotal->multiply($rate->basisPoints)->divide(10000);
+        return $breakdowns;
     }
 }

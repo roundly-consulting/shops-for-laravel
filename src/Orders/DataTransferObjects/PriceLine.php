@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders\DataTransferObjects;
 
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
 /**
  * A single priced line going into a {@see Price} calculation: the unit price,

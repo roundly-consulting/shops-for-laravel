@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
 use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 it('charges with the default null gateway and transitions to paid', function (): void {
     $order = Order::factory()->create();
@@ -34,7 +34,7 @@ it('leaves the status unchanged when the gateway fails', function (): void {
     {
         public function charge(Order $order): PaymentResult
         {
-            return PaymentResult::failure(Money::EUR(0), 'declined');
+            return PaymentResult::failure(Money::ofMinor(0, 'EUR'), 'declined');
         }
 
         public function refund(Order $order, Money $amount): PaymentResult
@@ -62,5 +62,5 @@ it('refunds via the null gateway', function (): void {
     $order = Order::factory()->create();
     $gateway = new NullPaymentGateway;
 
-    expect($gateway->refund($order, Money::EUR(500))->amount->getAmount())->toBe('500');
+    expect($gateway->refund($order, Money::ofMinor(500, 'EUR'))->amount->minor())->toBe('500');
 });

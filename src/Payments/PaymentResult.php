@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Payments;
 
-use RoundlyConsulting\Shops\Support\Money\Money;
+use RoundlyConsulting\Money\Money;
 
 /**
  * The outcome of a payment gateway charge or refund.

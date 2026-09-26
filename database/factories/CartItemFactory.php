@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Cart\CartItem;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @extends Factory<CartItem>
@@ -23,8 +23,8 @@ final class CartItemFactory extends Factory
             'name' => fake()->words(2, true),
             'sku' => mb_strtoupper(fake()->bothify('SKU-####')),
             'quantity' => fake()->numberBetween(1, 5),
-            'price' => Money::EUR((string) fake()->numberBetween(100, 5000)),
             'currency' => 'EUR',
+            'price' => Money::ofMinor(fake()->numberBetween(100, 5000), 'EUR'),
             'tax_class' => 'standard',
         ];
     }

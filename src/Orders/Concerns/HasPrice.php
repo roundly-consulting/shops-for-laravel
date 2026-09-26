@@ -6,6 +6,8 @@ namespace RoundlyConsulting\Shops\Orders\Concerns;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\Money\Currency;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
@@ -13,7 +15,6 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Shops\Shop;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @phpstan-require-extends Model
@@ -39,7 +40,9 @@ trait HasPrice
                 );
             }
 
-            $currency = (string) config('shops.pricing.default_currency', 'EUR');
+            // The order's own snapshotted currency — never the (changeable) config.
+            $currency = $this->getAttribute('currency');
+            $currency = $currency instanceof Currency ? $currency : Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
             $priceType = PriceType::from((string) config('shops.pricing.price_type', 'gross'));
 
             $base = new Price(

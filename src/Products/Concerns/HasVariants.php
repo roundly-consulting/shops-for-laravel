@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Support\Money\Money;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
 
 /**
@@ -107,13 +107,11 @@ trait HasVariants
             return;
         }
 
-        $currency = (string) config('shops.pricing.default_currency', 'EUR');
-
+        // The price cast writes the variant's currency column from the Money itself.
         $this->variants()->create([
             'sku' => $this->defaultVariantSku(),
             'name' => null,
-            'price' => Money::zero($currency),
-            'currency' => $currency,
+            'price' => Money::zero((string) config('shops.pricing.default_currency', 'EUR')),
         ]);
     }
 

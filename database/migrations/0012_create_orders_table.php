@@ -22,8 +22,12 @@ return new class extends Migration
             $table->string('number');
             $table->string('status')->default(Status::New->value);
 
-            // Store credit (minor units) applied to this order before the gateway charge.
-            $table->integer('store_credit_applied')->nullable();
+            // The order's own currency, snapshotted at creation (config changes never
+            // re-denominate a placed order).
+            $table->currencyCode('currency');
+            // Store credit applied before the gateway charge; shares the order currency
+            // column added above, so the macro skips it.
+            $table->money('store_credit_applied', currency: 'currency', nullable: true);
 
             $table->jsonb('billing_address')->nullable();
             $table->jsonb('shipping_address')->nullable();

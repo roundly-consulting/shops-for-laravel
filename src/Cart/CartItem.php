@@ -8,10 +8,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Money\Casts\AsMoney;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Database\Factories\CartItemFactory;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Support\Casts\MoneyCast;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @property int $id
@@ -48,7 +48,7 @@ final class CartItem extends Model
     {
         return [
             'quantity' => 'int',
-            'price' => MoneyCast::class,
+            'price' => AsMoney::currencyColumn('currency'),
         ];
     }
 

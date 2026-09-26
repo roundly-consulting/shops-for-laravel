@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Contracts;
 
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Discounts\DiscountResult;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * Resolves the discount a coupon code applies to a goods subtotal. The only

@@ -6,12 +6,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use RoundlyConsulting\Coupons\Models\Coupon;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 it('has relationships', function (): void {
     $order = new Order;
@@ -32,24 +32,24 @@ it('calculates total order price from items respecting quantity', function (): v
         ->toBeInstanceOf(Price::class)
         ->and($order->price->getSubtotal())
         ->toBeInstanceOf(Money::class)
-        ->getAmount()->toBe('2300')
-        ->getCurrency()->getCode()->toBe('EUR');
+        ->minor()->toBe('2300')
+        ->currency()->code->toBe('EUR');
 });
 
 it('returns a zero price for an order without items', function (): void {
     $order = Order::factory()->create();
 
-    expect($order->price->getSubtotal()->getAmount())->toBe('0')
-        ->and($order->price->getSubtotal()->getCurrency()->getCode())->toBe('EUR');
+    expect($order->price->getSubtotal()->minor())->toBe('0')
+        ->and($order->price->getSubtotal()->currency()->code)->toBe('EUR');
 });
 
 it('applies a coupon discount to the order price', function (): void {
-    $coupon = Coupon::factory()->percentage(10)->active()->create(['code' => 'SAVE10']);
+    $coupon = Coupon::factory()->percentage(1000)->active()->create(['code' => 'SAVE10']);
     $order = Order::factory()->create(['coupon_id' => $coupon->id]);
 
     Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
 
-    expect($order->refresh()->price->getPriceAfterDiscount()->getAmount())->toBe('900');
+    expect($order->refresh()->price->getPriceAfterDiscount()->minor())->toBe('900');
 });
 
 it('moves through its lifecycle via helper methods', function (): void {

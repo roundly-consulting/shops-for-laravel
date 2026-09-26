@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Payments;
 
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
 use RoundlyConsulting\Shops\Orders\Order;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * Default gateway that always succeeds without taking real payment, so the

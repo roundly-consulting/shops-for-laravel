@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             $table->jsonb('name');
             $table->localizedSlug('slug');
-            $table->string('currency', 3)->nullable();
+            $table->currencyCode('currency', nullable: true);
             $table->timestamps();
             $table->softDeletes();
         });

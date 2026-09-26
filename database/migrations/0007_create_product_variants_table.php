@@ -15,8 +15,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
             $table->string('sku');
             $table->string('name')->nullable();
-            $table->integer('price');
-            $table->string('currency');
+            $table->money('price', currency: 'currency'); // decimal(38,0) + currency code
             $table->string('tax_class')->default('standard');
             $table->boolean('track_stock')->default(true);
             $table->integer('stock')->default(0);

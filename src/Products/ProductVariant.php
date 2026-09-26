@@ -11,10 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
+use RoundlyConsulting\Money\Casts\AsMoney;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Database\Factories\ProductVariantFactory;
 use RoundlyConsulting\Shops\Products\Concerns\HasVariantMedia;
-use RoundlyConsulting\Shops\Support\Casts\MoneyCast;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @property int $id
@@ -52,7 +52,7 @@ final class ProductVariant extends Model implements HasMedia
     protected function casts(): array
     {
         return [
-            'price' => MoneyCast::class,
+            'price' => AsMoney::currencyColumn('currency'),
             'track_stock' => 'bool',
             'stock' => 'int',
             'reserved' => 'int',

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @extends Factory<ProductVariant>
@@ -24,8 +24,9 @@ final class ProductVariantFactory extends Factory
             'product_id' => Product::factory(),
             'sku' => mb_strtoupper(fake()->unique()->bothify('SKU-####-???')),
             'name' => fake()->words(2, true),
-            'price' => Money::of(fake()->numberBetween(100, 5000), $currency),
+            // `currency` before `price`: the price cast refuses to re-denominate the column.
             'currency' => $currency,
+            'price' => Money::ofMinor(fake()->numberBetween(100, 5000), $currency),
             'tax_class' => 'standard',
             'track_stock' => true,
             'stock' => fake()->numberBetween(0, 100),
@@ -37,8 +38,8 @@ final class ProductVariantFactory extends Factory
     public function withEurPrice(string $price): static
     {
         return $this->state(fn (array $attributes): array => [
-            'price' => Money::EUR($price),
             'currency' => 'EUR',
+            'price' => Money::ofMinor($price, 'EUR'),
         ]);
     }
 

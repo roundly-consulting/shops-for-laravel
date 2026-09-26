@@ -23,15 +23,15 @@ it('computes order tax from the shops own database rate', function (): void {
     $order = Order::factory()->create(['shop_id' => $shop->id]);
     Item::factory()->for($order)->withEurPrice('1190')->state(['quantity' => 1])->create();
 
-    expect($order->refresh()->price->getTaxPrice()->getAmount())->toBe('190')
-        ->and($order->price->getNetPrice()->getAmount())->toBe('1000');
+    expect($order->refresh()->price->getTaxPrice()->minor())->toBe('190')
+        ->and($order->price->getNetPrice()->minor())->toBe('1000');
 });
 
 it('falls back to the config floor for an order without a shop', function (): void {
     $order = Order::factory()->create(['shop_id' => null]);
     Item::factory()->for($order)->withEurPrice('1200')->state(['quantity' => 1])->create();
 
-    expect($order->refresh()->price->getTaxPrice()->getAmount())->toBe('200');
+    expect($order->refresh()->price->getTaxPrice()->minor())->toBe('200');
 });
 
 it('prefers a country-specific rate from the orders shipping address', function (): void {
@@ -49,7 +49,7 @@ it('prefers a country-specific rate from the orders shipping address', function 
     ]);
     Item::factory()->for($order)->withEurPrice('1200')->state(['quantity' => 1])->create();
 
-    expect($order->refresh()->price->getTaxPrice()->getAmount())->toBe('200');
+    expect($order->refresh()->price->getTaxPrice()->minor())->toBe('200');
 });
 
 it('scales tax proportionally with a coupon after the basis-point change', function (): void {
@@ -60,9 +60,9 @@ it('scales tax proportionally with a coupon after the basis-point change', funct
         'tax_class' => 'standard', 'rate' => 2000,
     ]);
 
-    $coupon = Coupon::factory()->percentage(10)->active()->create(['code' => 'SAVE10']);
+    $coupon = Coupon::factory()->percentage(1000)->active()->create(['code' => 'SAVE10']);
     $order = Order::factory()->create(['shop_id' => $shop->id, 'coupon_id' => $coupon->id]);
     Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
 
-    expect($order->refresh()->price->getTaxPrice()->getAmount())->toBe('180');
+    expect($order->refresh()->price->getTaxPrice()->minor())->toBe('180');
 });

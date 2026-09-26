@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @extends Factory<Item>
@@ -24,8 +24,8 @@ final class ItemFactory extends Factory
             'name' => fake()->words(3, true),
             'sku' => mb_strtoupper(fake()->bothify('SKU-####')),
             'quantity' => fake()->numberBetween(1, 10),
-            'price' => Money::of(fake()->numberBetween(100, 5000), $currency),
             'currency' => $currency,
+            'price' => Money::ofMinor(fake()->numberBetween(100, 5000), $currency),
             'tax_class' => 'standard',
             'order_id' => Order::factory(),
         ];
@@ -34,16 +34,16 @@ final class ItemFactory extends Factory
     public function withUsdPrice(string $price): static
     {
         return $this->state(fn (array $attributes): array => [
-            'price' => Money::USD($price),
             'currency' => 'USD',
+            'price' => Money::ofMinor($price, 'USD'),
         ]);
     }
 
     public function withEurPrice(string $price): static
     {
         return $this->state(fn (array $attributes): array => [
-            'price' => Money::EUR($price),
             'currency' => 'EUR',
+            'price' => Money::ofMinor($price, 'EUR'),
         ]);
     }
 }

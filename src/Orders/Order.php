@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Orders;
 
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Money\Casts\AsCurrency;
+use RoundlyConsulting\Money\Casts\AsMoney;
+use RoundlyConsulting\Money\Currency;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Database\Factories\OrderFactory;
 use RoundlyConsulting\Shops\Orders\Actions\TransitionOrderStatusAction;
@@ -20,6 +25,8 @@ use RoundlyConsulting\Shops\Orders\Concerns\HasPrice;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
+use RoundlyConsulting\Shops\Shops\CurrentShop;
+use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\Support\Casts\AddressCast;
 
 /**
@@ -30,7 +37,8 @@ use RoundlyConsulting\Shops\Support\Casts\AddressCast;
  * @property int|null $shop_id
  * @property string|null $customer_type
  * @property int|string|null $customer_id
- * @property int|null $store_credit_applied
+ * @property Currency $currency
+ * @property Money|null $store_credit_applied
  * @property string|null $note
  * @property Address|null $billing_address
  * @property Address|null $shipping_address
@@ -65,6 +73,31 @@ final class Order extends Model
     }
 
     /**
+     * Snapshot the currency on insert when none was set: the order's shop's (or the bound
+     * current shop's), else the configured default. A placed order keeps it even when
+     * SHOPS_DEFAULT_CURRENCY changes later. Done here rather than in a `creating` listener
+     * so it holds under `Event::fake()` too — the column is NOT NULL.
+     *
+     * @param  Builder<static>  $query
+     */
+    protected function performInsert(Builder $query): bool
+    {
+        if (($this->getAttributes()['currency'] ?? null) === null) {
+            $this->currency = $this->resolveShopForCurrency()?->currency()
+                ?? Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
+        }
+
+        return parent::performInsert($query);
+    }
+
+    private function resolveShopForCurrency(): ?Shop
+    {
+        $shop = $this->shop_id !== null ? $this->shop : app(CurrentShop::class)->get();
+
+        return $shop instanceof Shop ? $shop : null;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -78,7 +111,8 @@ final class Order extends Model
             'fulfilled_at' => 'datetime',
             'canceled_at' => 'datetime',
             'refunded_at' => 'datetime',
-            'store_credit_applied' => 'int',
+            'currency' => AsCurrency::class,
+            'store_credit_applied' => AsMoney::currencyColumn('currency'),
         ];
     }
 

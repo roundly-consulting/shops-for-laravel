@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Contracts;
 
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * Contract a host application's payment gateway implements. The package ships

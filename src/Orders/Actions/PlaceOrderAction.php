@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Coupons\CouponManager;
 use RoundlyConsulting\Shops\Cart\Actions\ClearCart;
 use RoundlyConsulting\Shops\Cart\Cart;
-use RoundlyConsulting\Shops\Discounts\MoneyBridge;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
 use RoundlyConsulting\Shops\Orders\Order;
 
 /**
- * Converts a cart into a placed order in a single transaction: each cart line is
+ * Converts a cart into a placed order in a single transaction: the order takes the
+ * cart's currency (a snapshot — config changes never re-denominate it), each cart line is
  * snapshotted into an order item, stock is reserved, the buyer (cart owner or an
  * explicit customer) is linked, an optional coupon is redeemed via
  * coupons-for-laravel, the billing/shipping addresses are stored, the order
@@ -29,7 +29,6 @@ final class PlaceOrderAction
         private readonly ReserveStockAction $reserveStock,
         private readonly ClearCart $clearCart,
         private readonly CouponManager $coupons,
-        private readonly MoneyBridge $moneyBridge,
     ) {}
 
     public function execute(Cart $cart, PlaceOrderData $data = new PlaceOrderData): Order
@@ -37,6 +36,7 @@ final class PlaceOrderAction
         return $cart->getConnection()->transaction(function () use ($cart, $data): Order {
             $order = new Order([
                 'status' => Status::New,
+                'currency' => $cart->currency,
                 'billing_address' => $data->billing,
                 'shipping_address' => $data->shipping,
                 'note' => $data->note,
@@ -92,7 +92,7 @@ final class PlaceOrderAction
             return;
         }
 
-        $price = $this->moneyBridge->toCoupons($order->price->getSubtotal());
+        $price = $order->price->getSubtotal();
         $redeemer = $order->customer instanceof Model ? $order->customer : null;
 
         if (! $coupon->isRedeemableBy($redeemer, $price)) {

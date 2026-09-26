@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Payments\Listeners;
 
+use Illuminate\Support\Facades\Log;
 use RoundlyConsulting\Credits\Interfaces\Creditable;
 use RoundlyConsulting\Shops\Orders\Events\OrderRefunded;
 
 /**
  * When store-credit refunds are enabled (`shops.payment.refund_to_store_credit`),
- * granting the refunded order's total back to the buyer's store-credit bucket
+ * grants the refunded order's total back to the buyer's store-credit bucket
  * instead of (or in addition to) a gateway refund. No-op when the order has no
- * creditable customer.
+ * creditable customer. A bucket that is not denominated in the order's currency is
+ * skipped with a warning rather than thrown: the refund has already happened, and a
+ * listener must not fail it.
  */
 final class GrantStoreCreditOnRefund
 {
@@ -27,16 +30,30 @@ final class GrantStoreCreditOnRefund
             return;
         }
 
-        $amount = $event->order->price->getFinalPrice()->getMinorAmount();
+        $final = $event->order->price->getFinalPrice();
 
-        if ($amount <= 0) {
+        if (! $final->isPositive()) {
             return;
         }
 
-        $customer->modifyCredits(
-            $amount,
+        $bucket = (string) config('shops.payment.store_credit_bucket', 'store_credit');
+        $currency = $customer->creditsCurrency($bucket);
+
+        if ($currency === null || ! $currency->equals($final->currency())) {
+            Log::warning('Store-credit refund skipped: the bucket is not denominated in the order currency.', [
+                'order' => $event->order->number,
+                'bucket' => $bucket,
+                'bucket_currency' => $currency?->code,
+                'order_currency' => $final->currency()->code,
+            ]);
+
+            return;
+        }
+
+        $customer->modifyCreditsMoney(
+            $final,
             description: "Store credit refund for order {$event->order->number}",
-            bucket: (string) config('shops.payment.store_credit_bucket', 'store_credit'),
+            bucket: $bucket,
         );
     }
 }

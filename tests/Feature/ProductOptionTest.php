@@ -5,11 +5,11 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductOption;
 use RoundlyConsulting\Shops\Products\ProductOptionValue;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 it('exposes option relationships', function (): void {
     expect((new ProductOption)->product())->toBeInstanceOf(BelongsTo::class)
@@ -30,12 +30,12 @@ it('resolves the variant for a set of option values', function (): void {
     $red = ProductOptionValue::factory()->for($colour, 'option')->create(['value' => 'Red']);
 
     $smallRed = $product->variants()->create([
-        'sku' => 'S-RED', 'price' => Money::EUR('1000'), 'currency' => 'EUR',
+        'sku' => 'S-RED', 'price' => Money::ofMinor('1000', 'EUR'), 'currency' => 'EUR',
     ]);
     $smallRed->optionValues()->attach([$small->id, $red->id]);
 
     $largeRed = $product->variants()->create([
-        'sku' => 'L-RED', 'price' => Money::EUR('1200'), 'currency' => 'EUR',
+        'sku' => 'L-RED', 'price' => Money::ofMinor('1200', 'EUR'), 'currency' => 'EUR',
     ]);
     $largeRed->optionValues()->attach([$large->id, $red->id]);
 

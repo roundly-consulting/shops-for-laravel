@@ -7,10 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 it('has relationships', function (): void {
     $product = new Product;
@@ -51,13 +51,13 @@ it('does not duplicate the default variant when re-ensured', function (): void {
 it('returns a zero price when it has no variant yet', function (): void {
     expect((new Product)->price)
         ->toBeInstanceOf(Money::class)
-        ->getAmount()->toBe('0');
+        ->minor()->toBe('0');
 });
 
 it('orders the default variant by position', function (): void {
     $product = Product::factory()->create();
     $product->variants()->create([
-        'sku' => 'SECOND', 'price' => Money::EUR('100'), 'currency' => 'EUR', 'position' => -1,
+        'sku' => 'SECOND', 'price' => Money::ofMinor('100', 'EUR'), 'currency' => 'EUR', 'position' => -1,
     ]);
 
     expect($product->refresh()->defaultVariant->sku)->toBe('SECOND');
@@ -87,8 +87,8 @@ it('proxies its price to the default variant', function (): void {
 
     expect($product->refresh()->price)
         ->toBeInstanceOf(Money::class)
-        ->getAmount()->toBe('5000')
-        ->getCurrency()->getCode()->toBe('EUR');
+        ->minor()->toBe('5000')
+        ->currency()->code->toBe('EUR');
 });
 
 it('casts published_at to carbon', function (): void {

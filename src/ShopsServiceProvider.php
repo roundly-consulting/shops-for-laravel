@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Shops;
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Attributes\Registry\AttributeRegistry;
 use RoundlyConsulting\Attributes\Registry\DefinitionFactory;
+use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
@@ -47,7 +48,7 @@ final class ShopsServiceProvider extends PackageServiceProvider
             ->contributesToAbout(static fn (): array => [
                 'Shop model' => class_basename(ShopModel::class()),
                 'Coupon model' => class_basename(CouponModel::class()),
-                'Currency' => (string) config('shops.pricing.default_currency', 'EUR'),
+                'Currency' => Currency::of((string) config('shops.pricing.default_currency', 'EUR'))->code,
                 'Price type' => (string) config('shops.pricing.price_type', 'gross'),
                 'Tax resolver' => self::className('shops.tax.resolver', DatabaseTaxResolver::class),
                 'Tax classes' => self::size('shops.tax_classes', 'defined'),

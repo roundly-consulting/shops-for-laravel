@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Money\Casts\AsCurrency;
+use RoundlyConsulting\Money\Currency;
+use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Cart\Concerns\HasOwner;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
@@ -18,13 +22,12 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Shops\Shop;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * @property int $id
  * @property string|null $token
  * @property int|null $shop_id
- * @property string $currency
+ * @property Currency $currency
  * @property string|null $coupon_code
  * @property-read Collection<int, CartItem> $items
  */
@@ -46,6 +49,16 @@ final class Cart extends Model
     }
 
     /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'currency' => AsCurrency::class,
+        ];
+    }
+
+    /**
      * @return HasMany<CartItem, $this>
      */
     public function items(): HasMany
@@ -56,9 +69,15 @@ final class Cart extends Model
     /**
      * Add a variant to the cart, snapshotting its price/sku and incrementing the
      * quantity when the same variant is already present.
+     *
+     * @throws CurrencyMismatch when the variant is priced in another currency than the cart.
      */
     public function add(ProductVariant $variant, int $quantity = 1): CartItem
     {
+        if (! $variant->price->currency()->equals($this->currency)) {
+            throw CurrencyMismatch::between($this->currency, $variant->price->currency());
+        }
+
         $existing = $this->items()->where('product_variant_id', $variant->id)->first();
 
         if ($existing !== null) {
@@ -72,8 +91,7 @@ final class Cart extends Model
             'name' => $variant->name ?? $variant->product->name,
             'sku' => $variant->sku,
             'quantity' => $quantity,
-            'price' => $variant->price,
-            'currency' => $this->currency,
+            'price' => $variant->price, // the cast writes the item's currency column
             'tax_class' => $variant->tax_class,
         ]);
 

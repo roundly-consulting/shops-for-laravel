@@ -65,6 +65,7 @@ arch('src only uses allowed vendor roots')
         'RoundlyConsulting\Credits',
         'RoundlyConsulting\Enums',
         'RoundlyConsulting\MediaLibrary',
+        'RoundlyConsulting\Money',
         'RoundlyConsulting\PackageToolkit',
         'RoundlyConsulting\Reviews',
         'RoundlyConsulting\Sluggable',
@@ -117,3 +118,63 @@ it('exposes a single public execute method on every action', function (): void {
         expect($names)->toBe(['execute'], "{$class} should expose only execute()");
     }
 });
+
+/**
+ * money-for-laravel is a hard dependency, but only its public surface is: its cast
+ * implementations, bcmath gateway and schema internals are `@internal`. Shops goes through
+ * AsMoney / AsCurrency / Money / Currency / Discount / DiscountAllocator / TaxRate only.
+ */
+it('does not import a money class marked @internal', function (): void {
+    $internal = [];
+
+    foreach (shopsPhpFilesIn(__DIR__.'/../vendor/roundly-consulting/money-for-laravel/src') as $file) {
+        $contents = (string) file_get_contents($file->getPathname());
+
+        // Class-level only: money also tags single methods of public classes.
+        if (preg_match('/@internal\b[^\n]*\n(?:\s*\*[^\n]*\n)*\s*\*\/\s*\n(?:#\[[^\n]*\]\s*\n)*(?:(?:final|abstract|readonly)\s+)*(?:class|interface|trait|enum)\s/', $contents) !== 1
+            || preg_match('/^namespace\s+([^;]+);/m', $contents, $namespace) !== 1) {
+            continue;
+        }
+
+        $internal[] = $namespace[1].'\\'.$file->getBasename('.php');
+    }
+
+    // Pinned by name so the scan cannot silently cover nothing.
+    expect($internal)
+        ->toContain('RoundlyConsulting\Money\Casts\MoneyCast')
+        ->toContain('RoundlyConsulting\Money\Math\Calculator')
+        ->not->toContain('RoundlyConsulting\Money\Money');
+
+    $offenders = [];
+
+    foreach ([...shopsPhpFilesIn(__DIR__.'/../src'), ...shopsPhpFilesIn(__DIR__.'/../database')] as $file) {
+        $contents = (string) file_get_contents($file->getPathname());
+
+        foreach ($internal as $class) {
+            if (str_contains($contents, 'use '.$class.';')) {
+                $offenders[] = $file->getBasename().' → '.$class;
+            }
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});
+
+/**
+ * @return list<SplFileInfo>
+ */
+function shopsPhpFilesIn(string $directory): array
+{
+    $files = [];
+
+    /** @var iterable<SplFileInfo> $iterator */
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS));
+
+    foreach ($iterator as $file) {
+        if ($file->isFile() && $file->getExtension() === 'php') {
+            $files[] = $file;
+        }
+    }
+
+    return $files;
+}

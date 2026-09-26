@@ -18,8 +18,8 @@ it('quotes zero for free shipping', function (): void {
 
     $quote = app(QuoteShippingAction::class)->execute($order, $destination);
 
-    expect($quote->getAmount())->toBe('0')
-        ->and($quote->getCurrency()->getCode())->toBe('EUR');
+    expect($quote->minor())->toBe('0')
+        ->and($quote->currency()->code)->toBe('EUR');
 });
 
 it('exposes a label for the free shipping method', function (): void {

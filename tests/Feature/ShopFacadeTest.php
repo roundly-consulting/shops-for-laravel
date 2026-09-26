@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Coupons\Models\Coupon;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Facades\Shop;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
@@ -10,7 +11,6 @@ use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\ShopManager;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 beforeEach(function (): void {
     config()->set('shops.pricing.default_currency', 'EUR');
@@ -45,10 +45,10 @@ it('charges an order through the facade', function (): void {
 });
 
 it('previews a coupon discount through the facade', function (): void {
-    Coupon::factory()->percentage(10)->active()->create(['code' => 'SAVE10']);
+    Coupon::factory()->percentage(1000)->active()->create(['code' => 'SAVE10']);
 
-    $result = Shop::discountFor('SAVE10', Money::EUR(1000));
+    $result = Shop::discountFor('SAVE10', Money::ofMinor(1000, 'EUR'));
 
-    expect($result->discount->getAmount())->toBe('100')
+    expect($result->discount->minor())->toBe('100')
         ->and($result->found)->toBeTrue();
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops;
 
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Discounts\DiscountResult;
@@ -14,7 +15,6 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
-use RoundlyConsulting\Shops\Support\Money\Money;
 
 /**
  * Discoverable entry point fronting the package's actions, resolved as a
