@@ -43,13 +43,26 @@ it('returns a zero price for an order without items', function (): void {
         ->and($order->price->getSubtotal()->currency()->code)->toBe('EUR');
 });
 
-it('applies a coupon discount to the order price', function (): void {
+it('applies the snapshotted discount to the order price', function (): void {
+    $order = Order::factory()->withDiscount('100', couponCode: 'SAVE10')->create();
+
+    Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
+
+    expect($order->refresh()->price->getPriceAfterDiscount()->minor())->toBe('900')
+        ->and($order->discount?->minor())->toBe('100')
+        ->and($order->coupon_code)->toBe('SAVE10')
+        ->and($order->free_shipping)->toBeFalse();
+});
+
+it('does not discount an order that merely links a coupon', function (): void {
+    // Only the placement snapshot discounts an order; a bare coupon link is a reference.
     $coupon = Coupon::factory()->percentage(1000)->active()->create(['code' => 'SAVE10']);
     $order = Order::factory()->create(['coupon_id' => $coupon->id]);
 
     Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
 
-    expect($order->refresh()->price->getPriceAfterDiscount()->minor())->toBe('900');
+    expect($order->refresh()->price->getPriceAfterDiscount()->minor())->toBe('1000')
+        ->and($order->coupon?->is($coupon))->toBeTrue();
 });
 
 it('moves through its lifecycle via helper methods', function (): void {

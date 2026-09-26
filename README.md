@@ -439,7 +439,9 @@ An order has many `items`, an optional `coupon`, an automatically generated `num
 own **`currency`** — snapshotted when it is created (from the cart at place-order, else its
 shop's, else `SHOPS_DEFAULT_CURRENCY`), so changing the configured default never
 re-denominates historical orders. Its `price` accessor returns a `Price` DTO that computes discount, shipping, tax, and the final
-total from the order's items.
+total from the order's items and the discount **snapshotted when the order was placed**
+(`discount`, `free_shipping`, `coupon_code`) — a coupon that later expires, is revoked or runs
+out of uses never re-prices a placed order.
 
 ```php
 use RoundlyConsulting\Shops\Orders\Order;
@@ -458,10 +460,10 @@ Item::create([
 $price = $order->price;                  // RoundlyConsulting\Shops\Orders\DataTransferObjects\Price
 
 $price->getSubtotal();           // sum of line totals (quantity-aware), before discount
-$price->getPriceAfterDiscount(); // after the coupon (if any)
+$price->getPriceAfterDiscount(); // after the placed discount (if any)
 $price->getNetPrice();           // tax-exclusive value of the goods
 $price->getTaxPrice();           // tax across the goods (after discount)
-$price->getDiscountValue();      // amount saved by the coupon
+$price->getDiscountValue();      // amount saved by the placed discount
 $price->getFinalPrice();         // amount the customer pays (goods + shipping, tax-correct)
 $price->taxSummary();            // money TaxSummary: net / tax / gross per rate (invoice VAT table)
 ```
@@ -638,8 +640,12 @@ $result->source;   // the coupon as a money Discount, to compose in a DiscountSt
 $cart->price('WELCOME10')->getFinalPrice();
 ```
 
-At place-order the coupon is linked to the order and redeemed once for the buyer (free-shipping
-coupons zero the shipping line). Swap the coupon model or resolver via `shops.discounts`.
+At place-order the coupon is linked to the order and redeemed once for the buyer, and the
+discount it grants is **snapshotted** onto the order (`discount` in the order currency,
+`free_shipping`, `coupon_code`). The order's price reads that snapshot, so expiring, revoking or
+exhausting the coupon afterwards — including the single use this order consumed — never changes
+what the order costs (free-shipping coupons zero the shipping line). Swap the coupon model or
+resolver via `shops.discounts`.
 
 ### Pay with store credit
 
@@ -731,6 +737,8 @@ fresh database. Moving onto money-for-laravel changed:
 - Every `Money` is `RoundlyConsulting\Money\Money` (`ofMinor()`, string `minor()`); the old
   `Support\Money` classes, `MoneyCast`, `MoneyBridge` and the three money exceptions are gone.
 - Prices and `store_credit_applied` are `decimal(38,0)`; `orders.currency` is new.
+- `orders` gained the discount snapshot (`discount`, `free_shipping`, `coupon_code`); an order's
+  price no longer re-resolves its coupon, and a bare `coupon_id` link discounts nothing.
 - Tax is allocated per line after the discount (may differ by ≤ 1 minor unit per line from the
   previous total-level ratio).
 - Store credit needs a denominated bucket: add `'currencies' => ['store_credit' => 'EUR']` to

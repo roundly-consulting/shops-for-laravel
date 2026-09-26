@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Coupons\CouponManager;
 use RoundlyConsulting\Shops\Cart\Actions\ClearCart;
 use RoundlyConsulting\Shops\Cart\Cart;
+use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
@@ -18,9 +19,10 @@ use RoundlyConsulting\Shops\Orders\Order;
  * cart's currency (a snapshot — config changes never re-denominate it), each cart line is
  * snapshotted into an order item, stock is reserved, the buyer (cart owner or an
  * explicit customer) is linked, an optional coupon is redeemed via
- * coupons-for-laravel, the billing/shipping addresses are stored, the order
- * number is generated, the cart is cleared, and {@see OrderPlaced} is fired. Any
- * oversell rolls the whole thing back and leaves the cart intact.
+ * coupons-for-laravel and its discount snapshotted onto the order, the
+ * billing/shipping addresses are stored, the order number is generated, the cart
+ * is cleared, and {@see OrderPlaced} is fired. Any oversell rolls the whole thing
+ * back and leaves the cart intact.
  */
 final class PlaceOrderAction
 {
@@ -29,6 +31,7 @@ final class PlaceOrderAction
         private readonly ReserveStockAction $reserveStock,
         private readonly ClearCart $clearCart,
         private readonly CouponManager $coupons,
+        private readonly DiscountResolver $discounts,
     ) {}
 
     public function execute(Cart $cart, PlaceOrderData $data = new PlaceOrderData): Order
@@ -70,15 +73,22 @@ final class PlaceOrderAction
 
             $this->clearCart->execute($cart);
 
+            // Refresh first so listeners read the snapshotted discount, not a price
+            // cached before the coupon was applied.
+            $order->refresh();
+
             OrderPlaced::dispatch($order);
 
-            return $order->refresh();
+            return $order;
         });
     }
 
     /**
-     * Link and redeem the coupon for the order's goods subtotal. A missing or
-     * non-redeemable coupon is silently skipped so it never blocks checkout.
+     * Link and redeem the coupon for the order's goods subtotal, snapshotting the
+     * discount it grants onto the order. The discount is resolved *before* redemption,
+     * while the coupon is still redeemable — a single-use coupon is exhausted by this
+     * very redemption. A missing or non-redeemable coupon is silently skipped so it
+     * never blocks checkout.
      */
     private function redeemCoupon(Order $order, ?string $code): void
     {
@@ -99,7 +109,12 @@ final class PlaceOrderAction
             return;
         }
 
+        $discount = $this->discounts->resolve($code, $price);
+
         $order->coupon()->associate($coupon);
+        $order->discount = $discount->discount;
+        $order->free_shipping = $discount->freeShipping;
+        $order->coupon_code = $coupon->code;
         $order->save();
 
         $coupon->redeemBy($redeemer, $price);

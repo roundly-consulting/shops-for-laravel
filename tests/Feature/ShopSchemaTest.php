@@ -31,3 +31,9 @@ it('creates the shops table with the expected columns', function (): void {
         expect(Schema::hasColumn('shops', $column))->toBeTrue();
     }
 });
+
+it('gives orders the discount snapshot columns', function (): void {
+    foreach (['discount', 'free_shipping', 'coupon_code', 'currency', 'store_credit_applied'] as $column) {
+        expect(Schema::hasColumn('orders', $column))->toBeTrue();
+    }
+});

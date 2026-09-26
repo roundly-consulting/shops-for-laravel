@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use RoundlyConsulting\Coupons\Models\Coupon;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
@@ -52,7 +51,7 @@ it('prefers a country-specific rate from the orders shipping address', function 
     expect($order->refresh()->price->getTaxPrice()->minor())->toBe('200');
 });
 
-it('scales tax proportionally with a coupon after the basis-point change', function (): void {
+it('scales tax proportionally with a snapshotted discount after the basis-point change', function (): void {
     config()->set('shops.pricing.price_type', 'net');
 
     $shop = Shop::factory()->create();
@@ -60,8 +59,7 @@ it('scales tax proportionally with a coupon after the basis-point change', funct
         'tax_class' => 'standard', 'rate' => 2000,
     ]);
 
-    $coupon = Coupon::factory()->percentage(1000)->active()->create(['code' => 'SAVE10']);
-    $order = Order::factory()->create(['shop_id' => $shop->id, 'coupon_id' => $coupon->id]);
+    $order = Order::factory()->withDiscount('100')->create(['shop_id' => $shop->id]);
     Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1])->create();
 
     expect($order->refresh()->price->getTaxPrice()->minor())->toBe('180');

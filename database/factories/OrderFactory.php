@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Order;
 
@@ -27,6 +28,21 @@ final class OrderFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'status' => $status,
+        ]);
+    }
+
+    /**
+     * A placed-order discount snapshot, as PlaceOrderAction records it: the amount
+     * granted in the order currency, the free-shipping flag and the coupon code.
+     */
+    public function withDiscount(string $minor, string $currency = 'EUR', bool $freeShipping = false, ?string $couponCode = null): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            // `currency` before `discount`: the money cast refuses to re-denominate the column.
+            'currency' => $currency,
+            'discount' => Money::ofMinor($minor, $currency),
+            'free_shipping' => $freeShipping,
+            'coupon_code' => $couponCode,
         ]);
     }
 

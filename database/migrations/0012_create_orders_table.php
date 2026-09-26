@@ -29,6 +29,13 @@ return new class extends Migration
             // column added above, so the macro skips it.
             $table->money('store_credit_applied', currency: 'currency', nullable: true);
 
+            // The coupon discount granted at placement, snapshotted in the order currency:
+            // a coupon that later expires, is revoked or runs out of uses (including the use
+            // this order consumed) never re-prices a placed order.
+            $table->money('discount', currency: 'currency', nullable: true);
+            $table->boolean('free_shipping')->default(false);
+            $table->string('coupon_code')->nullable();
+
             $table->jsonb('billing_address')->nullable();
             $table->jsonb('shipping_address')->nullable();
 

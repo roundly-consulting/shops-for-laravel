@@ -39,6 +39,9 @@ use RoundlyConsulting\Shops\Support\Casts\AddressCast;
  * @property int|string|null $customer_id
  * @property Currency $currency
  * @property Money|null $store_credit_applied
+ * @property Money|null $discount
+ * @property bool $free_shipping
+ * @property string|null $coupon_code
  * @property string|null $note
  * @property Address|null $billing_address
  * @property Address|null $shipping_address
@@ -113,6 +116,8 @@ final class Order extends Model
             'refunded_at' => 'datetime',
             'currency' => AsCurrency::class,
             'store_credit_applied' => AsMoney::currencyColumn('currency'),
+            'discount' => AsMoney::currencyColumn('currency'),
+            'free_shipping' => 'boolean',
         ];
     }
 

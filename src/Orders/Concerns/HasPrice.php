@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\Money\Money;
-use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
@@ -22,6 +21,11 @@ use RoundlyConsulting\Shops\Shops\Shop;
 trait HasPrice
 {
     /**
+     * The order's price from its items and the discount snapshotted when it was placed
+     * (`discount` + `free_shipping`). The coupon is never re-resolved here: its current
+     * redeemability — expired, revoked, used up by this very order — must not re-price a
+     * placed order, since the charge, store credit and refund credit-back all read this.
+     *
      * @return Attribute<Price, never>
      */
     protected function price(): Attribute
@@ -43,51 +47,20 @@ trait HasPrice
             // The order's own snapshotted currency — never the (changeable) config.
             $currency = $this->getAttribute('currency');
             $currency = $currency instanceof Currency ? $currency : Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
-            $priceType = PriceType::from((string) config('shops.pricing.price_type', 'gross'));
-
-            $base = new Price(
-                lines: $lines,
-                shipping: Money::zero($currency),
-                priceType: $priceType,
-                taxResolver: null,
-                currency: $currency,
-                shop: $this->resolveShop(),
-                country: $this->resolveCountry(),
-            );
-
-            $code = $this->couponCode();
-
-            if ($code === null) {
-                return $base;
-            }
-
-            $result = app(DiscountResolver::class)->resolve($code, $base->getSubtotal());
+            $discount = $this->getAttribute('discount');
 
             return new Price(
                 lines: $lines,
                 shipping: Money::zero($currency),
-                priceType: $priceType,
+                priceType: PriceType::from((string) config('shops.pricing.price_type', 'gross')),
                 taxResolver: null,
-                discount: $result->discount,
-                freeShipping: $result->freeShipping,
+                discount: $discount instanceof Money ? $discount : null,
+                freeShipping: (bool) $this->getAttribute('free_shipping'),
                 currency: $currency,
                 shop: $this->resolveShop(),
                 country: $this->resolveCountry(),
             );
         });
-    }
-
-    private function couponCode(): ?string
-    {
-        $coupon = $this->getAttribute('coupon');
-
-        if (! $coupon instanceof Model) {
-            return null;
-        }
-
-        $code = $coupon->getAttribute('code');
-
-        return is_string($code) && $code !== '' ? $code : null;
     }
 
     private function resolveShop(): ?Shop
