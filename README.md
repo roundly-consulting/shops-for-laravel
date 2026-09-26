@@ -750,9 +750,14 @@ your gateway (at most `$order->gatewayAmount()`), then transition the order:
 $result = app(PaymentGateway::class)->refund($order, $order->gatewayAmount());
 
 if ($result->successful) {
-    $order->refund(); // → Refunded, fires OrderRefunded (store-credit credit-back if enabled)
+    $order->refund(); // → Refunded, fires OrderRefunded
 }
 ```
+
+The gateway only took `gatewayAmount()`: return any store-credit share yourself
+(`$customer->modifyCreditsMoney($order->store_credit_applied, bucket: …)`). With
+`shops.payment.refund_to_store_credit` on, **skip the gateway refund** — `$order->refund()` alone
+credits the whole order total back as store credit, and doing both refunds the buyer twice.
 
 ## Upgrading
 
