@@ -29,3 +29,6 @@ All notable changes to `shops-for-laravel` will be documented in this file.
 - The default variant SKU derives from the fallback-locale slug, so it no longer depends on the
   request locale.
 - Removed the internal `Concerns\HasSlug` trait.
+- `orders.number` is unique across all orders (was `(number, shop_id)`, which let shop-less
+  orders share one); the default generator skips taken numbers and a checkout that races another
+  to the same generated number is renumbered instead of duplicating it.

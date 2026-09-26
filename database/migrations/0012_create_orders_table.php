@@ -50,7 +50,9 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['number', 'shop_id']);
+            // Globally unique — orders route-bind by number alone, and a composite with the
+            // nullable shop_id would let shop-less orders share one (NULLs never collide).
+            $table->unique('number');
         });
     }
 };

@@ -528,7 +528,11 @@ your application can listen to.
 
 By default order numbers are `<two-digit year><6-digit sequence>` (e.g. `24000001`),
 sequenced per year and counting soft-deleted orders. A number is assigned once, when the order
-is first inserted (unless you set one) — never when orders are loaded. Provide your own strategy by
+is first inserted (unless you set one) — never when orders are loaded. `orders.number` is
+unique across all orders (orders route-bind by it): the default generator skips numbers that
+are already taken, and when two checkouts race to the same generated number the second insert
+is refused by the index and simply asks the generator again (up to 5 times, in a savepoint). An
+explicitly set number is never replaced — a duplicate throws. Provide your own strategy by
 implementing `NumberGenerator` and pointing `shops.orders.number_generator` at it:
 
 ```php
