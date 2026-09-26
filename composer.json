@@ -33,6 +33,18 @@
         },
         {
             "type": "path",
+            "url": "../money-for-laravel*",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/roundly-consulting/money-for-laravel",
+            "no-api": true
+        },
+        {
+            "type": "path",
             "url": "../media-library-for-laravel*",
             "options": {
                 "symlink": true
@@ -141,14 +153,16 @@
         }
     ],
     "require": {
-        "illuminate/contracts": "^12.0|^13.0",
         "php": "^8.4",
+        "ext-bcmath": "*",
+        "illuminate/contracts": "^12.0|^13.0",
         "roundly-consulting/addresses-for-laravel": "@dev",
         "roundly-consulting/attributes-for-laravel": "@dev",
         "roundly-consulting/coupons-for-laravel": "@dev",
         "roundly-consulting/credits-for-laravel": "@dev",
         "roundly-consulting/enums-for-laravel": "@dev",
         "roundly-consulting/media-library-for-laravel": "@dev",
+        "roundly-consulting/money-for-laravel": "@dev",
         "roundly-consulting/package-toolkit-for-laravel": "@dev",
         "roundly-consulting/reviews-for-laravel": "@dev",
         "roundly-consulting/sluggable-for-laravel": "@dev"
