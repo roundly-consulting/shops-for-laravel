@@ -244,3 +244,20 @@ it('reads store credit settings from keys the published config file defines', fu
             ->not->toContain('shops.payments.');
     }
 });
+
+it('guards against double application from a stale copy of the order', function (): void {
+    $customer = Customer::create(['name' => 'Ada']);
+    $customer->modifyCredits(2000, bucket: 'store_credit');
+    $order = orderForCustomer($customer);
+
+    // A second request (a double-clicked "pay") loaded the same order before either applied.
+    $sameOrderElsewhere = Order::query()->findOrFail($order->getKey());
+
+    app(StoreCreditTender::class)->apply($order, $customer);
+
+    expect(fn () => app(StoreCreditTender::class)->apply($sameOrderElsewhere, $customer))
+        ->toThrow(StoreCreditAlreadyAppliedException::class)
+        // Debited once — the 1000 the order cost — never twice.
+        ->and($customer->creditsBalance(bucket: 'store_credit'))->toBe(1000)
+        ->and($order->refresh()->store_credit_applied?->minor())->toBe('1000');
+});
