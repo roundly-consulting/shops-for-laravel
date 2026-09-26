@@ -21,6 +21,10 @@ return new class extends Migration
             $table->smallInteger('quantity')->default(1);
             $table->money('price', currency: 'currency'); // decimal(38,0) + currency code
             $table->string('tax_class')->default('standard');
+            // The rate (basis points) and label the line was taxed at, snapshotted when it was
+            // added; null resolves the tax class live (an item written around AddOrderItemAction).
+            $table->unsignedInteger('tax_rate')->nullable();
+            $table->string('tax_label')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

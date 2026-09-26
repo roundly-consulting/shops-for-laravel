@@ -26,6 +26,8 @@ use RoundlyConsulting\Shops\Orders\Concerns\BelongsToVariant;
  * @property Money $price
  * @property string $currency
  * @property string $tax_class
+ * @property int|null $tax_rate
+ * @property string|null $tax_label
  */
 final class Item extends Model
 {
@@ -53,6 +55,7 @@ final class Item extends Model
         return [
             'quantity' => 'int',
             'price' => AsMoney::currencyColumn('currency'),
+            'tax_rate' => 'integer',
         ];
     }
 }

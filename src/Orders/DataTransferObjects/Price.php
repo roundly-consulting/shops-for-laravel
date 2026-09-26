@@ -170,7 +170,7 @@ final readonly class Price
 
         foreach ($this->lines as $index => $line) {
             $taxable = $totals[$index]->subtract($shares[$index]);
-            $rate = $this->taxResolver->rateFor($this->shop, $line->taxClass, $this->country)->toTaxRate();
+            $rate = ($line->taxRate ?? $this->taxResolver->rateFor($this->shop, $line->taxClass, $this->country))->toTaxRate();
 
             $breakdowns[] = $this->priceType === PriceType::Gross
                 ? $rate->breakdownFromGross($taxable)

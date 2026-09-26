@@ -441,7 +441,12 @@ shop's, else `SHOPS_DEFAULT_CURRENCY`), so changing the configured default never
 re-denominates historical orders. Its `price` accessor returns a `Price` DTO that computes discount, shipping, tax, and the final
 total from the order's items and the discount **snapshotted when the order was placed**
 (`discount`, `free_shipping`, `coupon_code`) — a coupon that later expires, is revoked or runs
-out of uses never re-prices a placed order.
+out of uses never re-prices a placed order. The same holds for tax: `AddOrderItemAction`
+snapshots the rate each line's tax class resolves to (`order_items.tax_rate` in basis points +
+`tax_label`) and the order keeps the `price_type` it was created under, so editing a shop's tax
+rates, changing the shipping address or flipping `shops.pricing.price_type` later never changes
+what a placed order costs. An item written without a snapshot (`tax_rate` null) is taxed at the
+live rate.
 
 ```php
 use RoundlyConsulting\Shops\Orders\Order;
@@ -761,6 +766,9 @@ fresh database. Moving onto money-for-laravel changed:
   price no longer re-resolves its coupon, and a bare `coupon_id` link discounts nothing.
 - Tax is allocated per line after the discount (may differ by ≤ 1 minor unit per line from the
   previous total-level ratio).
+- `orders.price_type` and `order_items.tax_rate` / `tax_label` are new: an order keeps the price
+  type and the per-line tax rates it was placed with.
+- `orders.number` is unique on its own (was `(number, shop_id)`).
 - Store credit needs a denominated bucket: add `'currencies' => ['store_credit' => 'EUR']` to
   `config/credits.php`.
 - Coupon percentages are basis points (`1000` = 10 %) and fixed coupons are currency-locked

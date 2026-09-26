@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Orders\DataTransferObjects;
 
 use RoundlyConsulting\Money\Money;
+use RoundlyConsulting\Shops\Support\Tax\TaxRateValue;
 
 /**
  * A single priced line going into a {@see Price} calculation: the unit price,
- * the quantity, and the tax class that determines its rate.
+ * the quantity, and the tax class that determines its rate — or, for a placed order's
+ * line, the rate it was snapshotted at (which then wins over the resolver).
  */
 final readonly class PriceLine
 {
@@ -16,6 +18,7 @@ final readonly class PriceLine
         public Money $unitPrice,
         public int $quantity = 1,
         public string $taxClass = 'standard',
+        public ?TaxRateValue $taxRate = null,
     ) {}
 
     public function lineTotal(): Money

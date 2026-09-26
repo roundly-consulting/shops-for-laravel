@@ -11,7 +11,8 @@ use RoundlyConsulting\Shops\Products\ProductVariant;
 
 /**
  * Adds a variant to an order as a line item, snapshotting the variant's
- * name, sku, price, and tax class at purchase time so later catalog changes
+ * name, sku, price, and tax class — and the tax rate that class resolves to for the
+ * order's shop and destination — at purchase time, so later catalog or tax-rate changes
  * never alter a placed order. Enforces the order's own (snapshotted) currency.
  */
 final class AddOrderItemAction
@@ -25,6 +26,8 @@ final class AddOrderItemAction
             throw CurrencyMismatch::between($order->currency, $variant->price->currency());
         }
 
+        $taxRate = $order->taxRateFor($variant->tax_class);
+
         // The price cast writes the item's currency column from the Money itself.
         $item = new Item([
             'product_id' => $variant->product_id,
@@ -34,6 +37,8 @@ final class AddOrderItemAction
             'quantity' => $quantity,
             'price' => $variant->price,
             'tax_class' => $variant->tax_class,
+            'tax_rate' => $taxRate->basisPoints,
+            'tax_label' => $taxRate->label,
         ]);
 
         $item->order()->associate($order);

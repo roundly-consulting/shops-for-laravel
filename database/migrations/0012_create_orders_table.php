@@ -25,6 +25,9 @@ return new class extends Migration
             // The order's own currency, snapshotted at creation (config changes never
             // re-denominate a placed order).
             $table->currencyCode('currency');
+            // The catalog price type (gross / net) the order was priced under, snapshotted at
+            // creation like the currency: flipping the config never re-prices a placed order.
+            $table->string('price_type');
             // Store credit applied before the gateway charge; shares the order currency
             // column added above, so the macro skips it.
             $table->money('store_credit_applied', currency: 'currency', nullable: true);

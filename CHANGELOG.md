@@ -32,3 +32,6 @@ All notable changes to `shops-for-laravel` will be documented in this file.
 - `orders.number` is unique across all orders (was `(number, shop_id)`, which let shop-less
   orders share one); the default generator skips taken numbers and a checkout that races another
   to the same generated number is renumbered instead of duplicating it.
+- Placed orders keep their tax: `AddOrderItemAction` snapshots each line's resolved rate
+  (`order_items.tax_rate` + `tax_label`) and orders snapshot `price_type`, so later rate edits,
+  address changes or a price-type flip no longer re-price them (a net order's total included).

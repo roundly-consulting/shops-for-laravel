@@ -24,6 +24,7 @@ use RoundlyConsulting\Shops\Orders\Concerns\HasNumber;
 use RoundlyConsulting\Shops\Orders\Concerns\HasPrice;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
+use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Shops\CurrentShop;
 use RoundlyConsulting\Shops\Shops\Shop;
@@ -38,6 +39,7 @@ use RoundlyConsulting\Shops\Support\Casts\AddressCast;
  * @property string|null $customer_type
  * @property int|string|null $customer_id
  * @property Currency $currency
+ * @property PriceType $price_type
  * @property Money|null $store_credit_applied
  * @property Money|null $discount
  * @property bool $free_shipping
@@ -78,7 +80,8 @@ final class Order extends Model
     /**
      * Snapshot the currency on insert when none was set: the order's shop's (or the bound
      * current shop's), else the configured default. A placed order keeps it even when
-     * SHOPS_DEFAULT_CURRENCY changes later. Then assign the order number (unless set).
+     * SHOPS_DEFAULT_CURRENCY changes later. The catalog price type is snapshotted the same
+     * way. Then assign the order number (unless set).
      * Done here rather than in a `creating` listener so both hold under `Event::fake()`
      * too — the columns are NOT NULL.
      *
@@ -89,6 +92,10 @@ final class Order extends Model
         if (($this->getAttributes()['currency'] ?? null) === null) {
             $this->currency = $this->resolveShopForCurrency()?->currency()
                 ?? Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
+        }
+
+        if (($this->getAttributes()['price_type'] ?? null) === null) {
+            $this->price_type = PriceType::from((string) config('shops.pricing.price_type', 'gross'));
         }
 
         $this->assignNumber();
@@ -118,6 +125,7 @@ final class Order extends Model
             'canceled_at' => 'datetime',
             'refunded_at' => 'datetime',
             'currency' => AsCurrency::class,
+            'price_type' => PriceType::class,
             'store_credit_applied' => AsMoney::currencyColumn('currency'),
             'discount' => AsMoney::currencyColumn('currency'),
             'free_shipping' => 'boolean',
