@@ -48,8 +48,7 @@ dependencies):
 | [`addresses-for-laravel`](https://github.com/roundly-consulting/addresses-for-laravel) | Customer address book → order billing/shipping snapshot |
 | [`sluggable-for-laravel`](https://github.com/roundly-consulting/sluggable-for-laravel) | Per-locale shop/product/category slugs — unique per shop, DB-enforced, locale-aware route binding, optional SEO slug history |
 
-See `docs/cross-package-integration-plan.md` for the org-wide tier map. Coupon logic now lives
-entirely in `coupons-for-laravel`; shops no longer ships its own coupon model.
+All coupon and discount logic lives in `coupons-for-laravel`.
 
 ## Installation
 
@@ -309,10 +308,9 @@ the same whatever locale the creating request ran under.
 (`php artisan vendor:publish --tag="sluggable-migrations"`) — renamed products keep answering
 their old URL with a 301 to the new one.
 
-**Upgrading an existing database.** Earlier builds did not enforce unique slugs, and a database
-that already ran the shops migrations has no slug indexes yet. Per model (`Shops\Shop`,
-`Products\Product`, `Products\Category`): find duplicates, preview and apply the rewrite, then add
-the indexes:
+**Importing existing catalogue data.** Rows imported with duplicate slugs must be fixed before
+the unique slug indexes can be added. Per model (`Shops\Shop`, `Products\Product`,
+`Products\Category`): find duplicates, preview and apply the rewrite, then add the indexes:
 
 ```bash
 php artisan sluggable:duplicates "RoundlyConsulting\Shops\Products\Product"
@@ -794,26 +792,6 @@ The gateway only took `gatewayAmount()`: return any store-credit share yourself
 (`$customer->modifyCreditsMoney($order->store_credit_applied, bucket: …)`). With
 `shops.payment.refund_to_store_credit` on, **skip the gateway refund** — `$order->refund()` alone
 credits the whole order total back as store credit, and doing both refunds the buyer twice.
-
-## Upgrading
-
-Shops is pre-1.0 and unreleased, so its migrations were edited in place — re-run them on a
-fresh database. Moving onto money-for-laravel changed:
-
-- Every `Money` is `RoundlyConsulting\Money\Money` (`ofMinor()`, string `minor()`); the old
-  `Support\Money` classes, `MoneyCast`, `MoneyBridge` and the three money exceptions are gone.
-- Prices and `store_credit_applied` are `decimal(38,0)`; `orders.currency` is new.
-- `orders` gained the discount snapshot (`discount`, `free_shipping`, `coupon_code`); an order's
-  price no longer re-resolves its coupon, and a bare `coupon_id` link discounts nothing.
-- Tax is allocated per line after the discount (may differ by ≤ 1 minor unit per line from the
-  previous total-level ratio).
-- `orders.price_type` and `order_items.tax_rate` / `tax_label` are new: an order keeps the price
-  type and the per-line tax rates it was placed with.
-- `orders.number` is unique on its own (was `(number, shop_id)`).
-- Store credit needs a denominated bucket: add `'currencies' => ['store_credit' => 'EUR']` to
-  `config/credits.php`.
-- Coupon percentages are basis points (`1000` = 10 %) and fixed coupons are currency-locked
-  (coupons-for-laravel).
 
 ## Testing
 
