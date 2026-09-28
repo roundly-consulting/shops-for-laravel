@@ -134,19 +134,120 @@ return [
 
 ## Usage
 
-### Shop facade
+### The `Shops` facade
 
-The optional `Shop` facade is a discoverable entry point fronting the package's actions. The
-underlying `ShopManager` is also resolvable for dependency injection:
+`Shops` is the whole API in one place. Each area is a scoped handle or a sub-accessor:
 
 ```php
-use RoundlyConsulting\Shops\Facades\Shop;
+use RoundlyConsulting\Shops\Facades\Shops;
+use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
+use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
+use RoundlyConsulting\Shops\Orders\Enums\Status;
 
-$order = Shop::placeOrder($cart, $placeOrderData);
-$order = Shop::transition($order, Status::Paid);
-$result = Shop::charge($order);
-$discount = Shop::discountFor('WELCOME10', Money::ofMinor(1000, 'EUR')); // DiscountResult
+// Cart — lines of another cart are refused (ForeignItemException)
+Shops::cart($cart)->add($variant, 2);            // CartItem; the same variant merges into its line
+Shops::cart($cart)->update($item, 3);            // ?CartItem — 0 removes the line
+Shops::cart($cart)->remove($item);
+Shops::cart($cart)->clear();                     // the "empty cart" button
+Shops::cart($cart)->price('SUMMER');             // Price DTO, optionally with a coupon code
+Shops::cart($cart)->subtotal();                  // Money
+$order = Shops::cart($cart)->checkout(new PlaceOrderData(couponCode: 'SUMMER'));
+
+// Order
+Shops::order($order)->transition(Status::InProgress);
+Shops::order($order)->charge();                  // PaymentResult — Paid on success
+Shops::order($order)->fulfil();                  // reservation becomes a sale
+Shops::order($order)->cancel();                  // reservation released
+Shops::order($order)->refund();
+Shops::order($order)->quoteShipping($address);   // Money, through the bound ShippingMethod
+
+// Inventory — every change is a StockAdjustment ledger row
+Shops::inventory($variant)->receive(10, ref: $purchaseOrder, note: 'PO-17');
+Shops::inventory($variant)->returned(1, $order); // the variant must be on that order
+Shops::inventory($variant)->adjust(-2, StockReason::Manual, note: 'Damaged');
+Shops::inventory($variant)->available();         // stock - reserved
+
+// Coupons, tenancy, addresses
+Shops::coupons()->preview('WELCOME10', Money::ofMinor(1000, 'EUR')); // DiscountResult, no redemption
+Shops::current()->set($shop);                    // CurrentShop: set / get / id / forget / run
+Shops::addresses()->defaults($customer);         // OrderAddresses (billing, shipping)
 ```
+
+The model convenience methods — `$cart->add()`, `$order->transitionTo()`, `markInProgress()`,
+`markPaid()`, `markFulfilled()`, `cancel()`, `refund()`, `Shop::current()` — go through the same
+manager, so they behave identically and `Shops::fake()` sees them.
+
+The facade is also registered as the `Shops` alias.
+
+#### Without the facade
+
+The facade's root is `ShopsManager`, a singleton you can inject; every call resolves its action
+from the container, so your bindings apply. The actions are public too, for queued jobs and your
+own actions:
+
+```php
+use RoundlyConsulting\Shops\Actions\Cart\AddToCartAction;
+use RoundlyConsulting\Shops\Actions\Inventory\AdjustStockAction;
+use RoundlyConsulting\Shops\Actions\Orders\PlaceOrderAction;
+use RoundlyConsulting\Shops\ShopsManager;
+
+final class CheckoutController
+{
+    public function __construct(private ShopsManager $shops) {}
+
+    public function __invoke(Request $request, Cart $cart): Order
+    {
+        return $this->shops->cart($cart)->checkout(PlaceOrderData::fromAddressBook($request->user()));
+    }
+}
+
+app(AddToCartAction::class)->execute($cart, $variant, 2);
+app(PlaceOrderAction::class)->execute($cart, new PlaceOrderData);
+app(AdjustStockAction::class)->execute($variant, 10, StockReason::Received, $purchaseOrder, 'PO-17');
+```
+
+| Facade | Action |
+|---|---|
+| `cart()->add()` | `Actions\Cart\AddToCartAction` |
+| `cart()->update()` | `Actions\Cart\UpdateCartItemAction` |
+| `cart()->remove()` | `Actions\Cart\RemoveFromCartAction` |
+| `cart()->clear()` | `Actions\Cart\ClearCartAction` |
+| `cart()->checkout()` | `Actions\Orders\PlaceOrderAction` |
+| `order()->transition()` / `cancel()` / `refund()` / `fulfil()` | `Actions\Orders\TransitionOrderStatusAction` |
+| `order()->charge()` | `Actions\Orders\ChargeOrderAction` |
+| `order()->quoteShipping()` | `Actions\Orders\QuoteShippingAction` |
+| `inventory()->receive()` / `returned()` / `adjust()` | `Actions\Inventory\AdjustStockAction` |
+
+Checkout's building blocks (`AddOrderItemAction`, `ReserveStockAction`, `ReleaseStockAction`)
+are `@internal`.
+
+#### Faking it in your tests
+
+`Shops::fake()` swaps in `ShopsFake`, a recording subtype of `ShopsManager` (so injected managers
+get it too). It is a spy: every operation still runs — carts, orders and stock rows are real and
+events fire — and each state change is recorded, whether it came through the facade, an injected
+manager or a model method. A charge still goes through the bound `PaymentGateway`; the default
+`NullPaymentGateway` charges nothing.
+
+```php
+use RoundlyConsulting\Shops\Testing\CartChange;
+
+Shops::fake();
+
+$this->post('/checkout')->assertRedirect();
+
+Shops::assertCartChanged($cart, CartChange::Added);   // Added / Updated / Removed / Cleared
+Shops::assertOrderPlaced($cart);
+Shops::assertCharged($order);
+Shops::assertTransitioned($order, Status::Paid);
+Shops::assertStockAdjusted($variant, delta: 10, reason: StockReason::Received);
+
+// Each has a negative: assertNothingPlaced(), assertNothingCharged(), assertNothingTransitioned(),
+// assertNothingStockAdjusted(), assertNothingCartChanged().
+```
+
+Only the calls your code makes are recorded: the stock a checkout reserves is part of
+`assertOrderPlaced`, and the transitions a successful charge makes are part of `assertCharged`.
 
 ### Query scopes & route binding
 
@@ -167,8 +268,8 @@ foreign key. A single-shop app can ignore it entirely (the column is nullable); 
 app creates shops and scopes data to them.
 
 ```php
+use RoundlyConsulting\Shops\Facades\Shops;
 use RoundlyConsulting\Shops\Shops\Shop;
-use RoundlyConsulting\Shops\Shops\CurrentShop;
 
 $shop = Shop::create(['name' => 'Acme EU', 'currency' => 'EUR']);
 $shop->currency();   // Currency (EUR) — the per-shop override, or the configured default when null
@@ -177,16 +278,18 @@ $shop->currency();   // Currency (EUR) — the per-shop override, or the configu
 $product = Product::create(['shop_id' => $shop->id, 'name' => 'Sparkling Water']);
 
 // Or bind a current shop and let ownership auto-fill on create:
-app(CurrentShop::class)->set($shop);
+Shops::current()->set($shop);                        // a Shop or its id
 Product::create(['name' => 'Still Water']);          // shop_id auto-filled
-app(CurrentShop::class)->forget();
+Shops::current()->id();                              // ?int
+Shops::current()->forget();
 
 // Scoped block — restores the previous binding afterwards (even on exception):
-app(CurrentShop::class)->run($shop, function () {
+Shops::current()->run($shop, function () {
     Product::create(['name' => 'Tonic']);            // belongs to $shop
 });
 
-Shop::current();                         // ?Shop bound to the current context
+Shops::current()->get();                 // ?Shop bound to the current context
+Shop::current();                         // the same, typed to the package's Shop model
 
 Product::query()->forShop($shop)->get();       // scope by model
 Product::query()->forShop($shop->id)->get();   // or by id
@@ -368,16 +471,25 @@ $product->variantFor([$small->id]); // ?ProductVariant
 ### Inventory & stock
 
 Stock is an auditable ledger: every change is a `StockAdjustment` row, and the variant caches
-`stock` (on hand) and `reserved` (held for pending orders). All writes go through
-`AdjustStockAction`, which row-locks the variant inside a transaction to avoid oversell:
+`stock` (on hand) and `reserved` (held for pending orders). Every write goes through
+`AdjustStockAction`, which row-locks the variant inside a transaction to avoid oversell.
+`Shops::inventory($variant)` is the way in:
 
 ```php
-use RoundlyConsulting\Shops\Inventory\Actions\AdjustStockAction;
+use RoundlyConsulting\Shops\Facades\Shops;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 
-app(AdjustStockAction::class)->execute($variant, 100, StockReason::Received);   // +100 on hand
-app(AdjustStockAction::class)->execute($variant, -1, StockReason::Sold, $order); // sell one
+Shops::inventory($variant)->receive(100, ref: $purchaseOrder, note: 'PO-17'); // +100 on hand
+Shops::inventory($variant)->returned(1, $order);                             // +1, booked against the order
+Shops::inventory($variant)->adjust(-2, note: 'Stock count');                  // Manual correction, either sign
+Shops::inventory($variant)->adjust(-1, StockReason::Sold, $posSale);          // sell one outside an order
+Shops::inventory($variant)->available();                                     // stock - reserved
+Shops::inventory($variant)->inStock(3);                                      // bool
 ```
+
+Each call returns the `StockAdjustment` row; `ref` is any model that explains the change (a
+purchase order, an RMA, the order). A return against an `Order` the variant was never on throws
+`ForeignItemException`.
 
 The sign must match the reason — `Received`, `Returned` and `Reserved` add (positive),
 `Sold` and `Released` remove (negative), `Manual` goes either way — and a zero delta is
@@ -387,7 +499,7 @@ Selling below available stock on a `track_stock` variant throws `InsufficientSto
 variants with `track_stock = false` (digital/unlimited goods) never throw. Every adjustment
 fires `StockAdjusted`, and crossing `shops.inventory.low_stock_threshold` fires `StockRanLow`.
 
-Orders manage reservations automatically: `ReserveStockAction` holds each line's quantity when
+Orders manage reservations automatically: checkout holds each line's quantity when
 an order is placed, canceling an order **releases** the hold, and fulfilling an order
 **converts** the reservation into a sale (decrementing on-hand stock). An oversell during
 reservation rolls back the whole order and holds nothing.
@@ -424,40 +536,49 @@ another currency throws `CurrencyMismatch`) and read its price through the same 
 use:
 
 ```php
-use RoundlyConsulting\Shops\Cart\Actions\UpdateCartItem;
 use RoundlyConsulting\Shops\Cart\Cart;
+use RoundlyConsulting\Shops\Facades\Shops;
 
 $cart = Cart::create(['currency' => 'EUR']);
-$cart->add($variant, quantity: 2);   // snapshots name/sku/price; same variant increments
+$item = Shops::cart($cart)->add($variant, 2); // snapshots name/sku/price; same variant increments
+$cart->add($variant);                         // the same, as a model method
 
-$cart->subtotal();   // Money
-$cart->price();      // Price DTO (pass a coupon to discount it)
+Shops::cart($cart)->subtotal();  // Money
+Shops::cart($cart)->price();     // Price DTO (pass a coupon code to discount it)
 
-app(UpdateCartItem::class)->execute($item, 3); // set a line's quantity
-app(UpdateCartItem::class)->execute($item, 0); // 0 removes the line (returns null)
+Shops::cart($cart)->update($item, 3); // set a line's quantity
+Shops::cart($cart)->update($item, 0); // 0 removes the line (returns null)
+Shops::cart($cart)->remove($item);
+Shops::cart($cart)->clear();          // every line; the cart itself stays
 ```
 
+The cart row is locked while a line is added, so a double-clicked "add" lands on one line. A
+line of another cart is refused with `RoundlyConsulting\Shops\Exceptions\ForeignItemException`
+before anything is written — scope carts to the current customer and let the handle guard the
+line ids that arrive in a request.
+
 A quantity is a whole number of items from 1 to 32 767 (`Support\Quantity::MAX`, the range of
-the quantity columns). Anything else — zero or negative in `add()` / `AddToCart` /
-`AddOrderItemAction`, negative in `UpdateCartItem`, a fraction, or a line that would grow past
+the quantity columns). Anything else — zero or negative in `add()`, negative in `update()`, a
+fraction, or a line that would grow past
 the maximum — throws `RoundlyConsulting\Shops\Exceptions\InvalidQuantityException` before
 anything is written. `CartItem` and order `Item` guard their `quantity` on every write too
 (integer strings such as request input are accepted), and a `PriceLine` needs at least one item.
 
-`PlaceOrderAction` turns a cart into an order in one transaction — snapshotting each line,
-reserving stock, linking a coupon by code, storing the billing/shipping address, generating the
-number, firing `OrderPlaced`, and clearing the cart. An oversell rolls everything back and
-leaves the cart untouched:
+`Shops::cart($cart)->checkout()` turns a cart into an order in one transaction — snapshotting
+each line, reserving stock, linking a coupon by code, storing the billing/shipping address,
+generating the number, firing `OrderPlaced`, and clearing the cart. An oversell rolls everything
+back and leaves the cart untouched:
 
 ```php
-use RoundlyConsulting\Shops\Orders\Actions\PlaceOrderAction;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 
-$order = app(PlaceOrderAction::class)->execute($cart, new PlaceOrderData(
+$order = Shops::cart($cart)->checkout(new PlaceOrderData(
     billing: new Address('Ada Lovelace', '1 Analytical Way', 'London', 'EC1', 'GB'),
     couponCode: 'WELCOME10',
 ));
+
+$order = Shops::cart($cart)->checkout(); // no addresses, the cart's own coupon_code
 ```
 
 Billing and shipping addresses are stored as JSON and cast to an immutable `Address` DTO.
@@ -470,7 +591,7 @@ shop's, else `SHOPS_DEFAULT_CURRENCY`), so changing the configured default never
 re-denominates historical orders. Its `price` accessor returns a `Price` DTO that computes discount, shipping, tax, and the final
 total from the order's items and the discount **snapshotted when the order was placed**
 (`discount`, `free_shipping`, `coupon_code`) — a coupon that later expires, is revoked or runs
-out of uses never re-prices a placed order. The same holds for tax: `AddOrderItemAction`
+out of uses never re-prices a placed order. The same holds for tax: checkout
 snapshots the rate each line's tax class resolves to (`order_items.tax_rate` in basis points +
 `tax_label`) and the order keeps the `price_type` it was created under, so editing a shop's tax
 rates, changing the shipping address or flipping `shops.pricing.price_type` later never changes
@@ -505,7 +626,7 @@ $price->taxSummary();            // money TaxSummary: net / tax / gross per rate
 `$order->price` is computed once per model instance and cached, together with its loaded
 `items`: after changing an order in memory (adding items, applying a discount) call
 `$order->refresh()` before reading the price again — and before charging it, since
-`ChargeOrderAction` and `StoreCreditTender` charge the price they read. `PlaceOrderAction`
+`Shops::order($order)->charge()` and `StoreCreditTender` charge the price they read. `checkout()`
 already hands back a refreshed order.
 
 Pricing is **quantity-aware** (a 2× line is billed twice) and **tax-correct** for both
@@ -535,12 +656,18 @@ Fulfilled  → Refunded
 Canceled, Refunded   (terminal)
 ```
 
-Transition with the helper methods on the order; each one validates the move, stamps the
-matching timestamp column (`in_progress_at`, `paid_at`, `fulfilled_at`, `canceled_at`,
-`refunded_at`), persists, and fires events:
+Transition through `Shops::order($order)` or the helper methods on the order (they call the
+same manager); each one validates the move under the order's row lock, stamps the matching
+timestamp column (`in_progress_at`, `paid_at`, `fulfilled_at`, `canceled_at`, `refunded_at`),
+persists, and fires events:
 
 ```php
 use RoundlyConsulting\Shops\Orders\Enums\Status;
+
+Shops::order($order)->transition(Status::InProgress);
+Shops::order($order)->fulfil();   // Paid → Fulfilled
+Shops::order($order)->cancel();
+Shops::order($order)->refund();
 
 $order->markInProgress();   // New → InProgress
 $order->markPaid();         // InProgress → Paid, stamps paid_at, fires OrderPaid
@@ -670,19 +797,19 @@ and records the redemption at place-order:
 ```php
 use RoundlyConsulting\Coupons\Facades\Coupons;
 use RoundlyConsulting\Coupons\Enums\DiscountType;
-use RoundlyConsulting\Shops\Facades\Shop;
+use RoundlyConsulting\Shops\Facades\Shops;
 use RoundlyConsulting\Money\Money;
 
 $coupon = Coupons::generate(DiscountType::Percentage, 1000, 'WELCOME10'); // basis points: 10 %
 $coupon->activate()->save();
 
 // Preview a discount (no redemption):
-$result = Shop::discountFor('WELCOME10', Money::ofMinor(1000, 'EUR'));
+$result = Shops::coupons()->preview('WELCOME10', Money::ofMinor(1000, 'EUR'));
 $result->discount; // 1.00 EUR off
 $result->source;   // the coupon as a money Discount, to compose in a DiscountStack
 
 // Price a cart with a code (defaults to the cart's stored coupon_code):
-$cart->price('WELCOME10')->getFinalPrice();
+Shops::cart($cart)->price('WELCOME10')->getFinalPrice();
 ```
 
 At place-order the coupon is linked to the order and redeemed once for the buyer, and the
@@ -701,8 +828,8 @@ With `credits-for-laravel`, buyers can pay all or part of an order from a store-
 'currencies' => ['store_credit' => 'EUR'], // your shop currency; one bucket per currency
 ```
 
-Enable `shops.payment.allow_store_credit` (env `SHOPS_ALLOW_STORE_CREDIT`); `ChargeOrderAction`
-then debits available credit before charging the gateway for the remainder
+Enable `shops.payment.allow_store_credit` (env `SHOPS_ALLOW_STORE_CREDIT`);
+`Shops::order($order)->charge()` then debits available credit before charging the gateway for the remainder
 (`$order->gatewayAmount()`) — an order credit covers in full is marked paid without a gateway
 charge. The bucket is
 `shops.payment.store_credit_bucket`, and refunds can be returned as store credit via
@@ -729,7 +856,11 @@ addresses. Add `HasAddresses` to your customer model, then:
 ```php
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 
-$order = Shop::placeOrder($cart, PlaceOrderData::fromAddressBook($customer));
+$order = Shops::cart($cart)->checkout(PlaceOrderData::fromAddressBook($customer));
+
+$defaults = Shops::addresses()->defaults($customer); // OrderAddresses
+$defaults->shipping; // ?Address
+$defaults->billing;  // ?Address
 ```
 
 Shipping is taken from the customer's primary shipping address and billing from their primary
@@ -764,15 +895,12 @@ final class StripeGateway implements PaymentGateway
 ```
 
 Register it in `config/shops.php` (`payment.gateway` / `shipping.method`). Charge an order
-through the bound gateway with `ChargeOrderAction` — on success it transitions the order to
-`Paid`:
+through the bound gateway — on success it transitions the order to `Paid` — and quote its
+shipping through the bound method:
 
 ```php
-use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
-use RoundlyConsulting\Shops\Orders\Actions\QuoteShippingAction;
-
-$result = app(ChargeOrderAction::class)->execute($order); // PaymentResult
-$quote  = app(QuoteShippingAction::class)->execute($order, $destinationAddress); // Money
+$result = Shops::order($order)->charge();                        // PaymentResult
+$quote  = Shops::order($order)->quoteShipping($destinationAddress); // Money
 ```
 
 A failed charge leaves the order's status unchanged. A zero balance (store credit covered the
@@ -799,6 +927,9 @@ credits the whole order total back as store credit, and doing both refunds the b
 ```bash
 composer test
 ```
+
+In your application's tests, `Shops::fake()` records every cart change, checkout, charge,
+transition and stock adjustment — see [Faking it in your tests](#faking-it-in-your-tests).
 
 ## Changelog
 
