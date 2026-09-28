@@ -56,23 +56,15 @@ ArchPresets::runtimeRequireIsWhitelisted(__DIR__.'/../composer.json');
 ArchPresets::noDebuggingLeftovers();
 
 // One path into behaviour: model convenience methods and model traits reach actions through
-// ShopsManager, so `Shops::fake()` sees `$cart->add()` and `$order->markPaid()`.
+// ShopsManager, so `Shops::fake()` sees `$cart->add()` and `$order->markPaid()`. Shops groups
+// its models by area (`Cart\Cart`, `Orders\Order`, `Products\ProductVariant`, `Shops\Shop`,
+// `Inventory\StockAdjustment`) with their traits beside them (`Orders\Concerns\HasNumber`); the
+// preset finds every Eloquent model under the namespace and every package trait they use, so
+// no per-folder rule is needed. The rest of those folders (DTOs, enums, events, exceptions and
+// the `current()` / `addresses()` sub-accessors, which may resolve actions) is not model code.
 ArchPresets::modelsGoThroughTheFacade('RoundlyConsulting\Shops');
 
 // ── shops-specific rules the presets don't express ────────────────────────────
-
-// The preset above scans `Shops\Models|Concerns|Traits`. Shops groups its models by domain
-// (`Cart\Cart`, `Orders\Order`, `Products\ProductVariant`, `Shops\Shop`,
-// `Inventory\StockAdjustment`) with their traits beside them, so the preset alone guards only
-// the shared `Shops\Concerns`. This extends the same rule to the domain namespaces; the
-// handles and the manager, which are the path, live outside them. One rule per namespace:
-// Pest's `->not->toUse()` over a multi-element `expect([...])` fails only when every subject
-// uses the target, so a single offender would slip through a combined rule.
-foreach (['Cart', 'Inventory', 'Orders', 'Products', 'Shops'] as $domain) {
-    arch("{$domain} models and traits reach actions only through the manager")
-        ->expect("RoundlyConsulting\\Shops\\{$domain}")
-        ->not->toUse('RoundlyConsulting\Shops\Actions');
-}
 
 arch('src only uses allowed vendor roots')
     ->expect('RoundlyConsulting\Shops')
