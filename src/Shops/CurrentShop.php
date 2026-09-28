@@ -16,6 +16,8 @@ use RoundlyConsulting\Shops\Support\ShopModel;
  * job, or scoped block) and have {@see BelongsToShop}
  * auto-fill `shop_id` on new owned records. An explicitly set `shop_id` always
  * wins; with nothing bound, nothing is auto-filled.
+ *
+ * Returned by `Shops::current()`.
  */
 final class CurrentShop
 {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Addresses\DataTransferObjects\AddressData;
 use RoundlyConsulting\Addresses\Enums\AddressType;
+use RoundlyConsulting\Shops\Actions\Orders\PlaceOrderAction;
 use RoundlyConsulting\Shops\Cart\Cart;
-use RoundlyConsulting\Shops\Orders\Actions\PlaceOrderAction;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Tests\Fixtures\Customer;

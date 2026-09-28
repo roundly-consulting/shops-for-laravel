@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Contracts\TaxResolver;
-use RoundlyConsulting\Shops\Orders\Actions\AddOrderItemAction;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
@@ -81,7 +80,7 @@ trait HasPrice
 
     /**
      * The rate a line of the given tax class is taxed at on this order right now — its shop's
-     * rates, for its shipping destination. {@see AddOrderItemAction} snapshots it onto each
+     * rates, for its shipping destination. Checkout snapshots it onto each order
      * item, so a later rate edit or address change never re-prices the placed order.
      */
     public function taxRateFor(string $taxClass): TaxRateValue

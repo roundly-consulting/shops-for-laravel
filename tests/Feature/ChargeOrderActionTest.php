@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Money\Money;
+use RoundlyConsulting\Shops\Actions\Orders\ChargeOrderAction;
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
-use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;

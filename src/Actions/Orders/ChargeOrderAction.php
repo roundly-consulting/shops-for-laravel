@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Shops\Orders\Actions;
+namespace RoundlyConsulting\Shops\Actions\Orders;
 
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Credits\Interfaces\Creditable;

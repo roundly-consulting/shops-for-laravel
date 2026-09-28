@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
-use RoundlyConsulting\Shops\Orders\Actions\AddOrderItemAction;
+use RoundlyConsulting\Shops\Actions\Orders\AddOrderItemAction;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;

@@ -208,7 +208,10 @@
         "laravel": {
             "providers": [
                 "RoundlyConsulting\\Shops\\ShopsServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "Shops": "RoundlyConsulting\\Shops\\Facades\\Shops"
+            }
         }
     },
     "minimum-stability": "dev",

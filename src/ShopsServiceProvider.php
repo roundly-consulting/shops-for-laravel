@@ -74,7 +74,7 @@ final class ShopsServiceProvider extends PackageServiceProvider
         parent::register();
 
         $this->app->singleton(CurrentShop::class);
-        $this->app->singleton(ShopManager::class);
+        $this->app->singleton(ShopsManager::class);
 
         $this->bindFromConfig(NumberGenerator::class, 'shops.orders.number_generator', DefaultNumberGenerator::class);
         $this->bindFromConfig(TaxResolver::class, 'shops.tax.resolver', DatabaseTaxResolver::class);

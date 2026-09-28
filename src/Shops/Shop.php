@@ -16,6 +16,7 @@ use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\ShopFactory;
 use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\Product;
+use RoundlyConsulting\Shops\ShopsManager;
 use RoundlyConsulting\Shops\Support\ShopModel;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
@@ -154,7 +155,7 @@ class Shop extends Model implements Sluggable, Translatable
      */
     public static function current(): ?self
     {
-        $shop = app(CurrentShop::class)->get();
+        $shop = app(ShopsManager::class)->current()->get();
 
         return $shop instanceof self ? $shop : null;
     }

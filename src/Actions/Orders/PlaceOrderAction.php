@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Shops\Orders\Actions;
+namespace RoundlyConsulting\Shops\Actions\Orders;
 
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Coupons\CouponManager;
 use RoundlyConsulting\Coupons\Exceptions\CouponNotRedeemable;
-use RoundlyConsulting\Shops\Cart\Actions\ClearCart;
+use RoundlyConsulting\Shops\Actions\Cart\ClearCartAction;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
@@ -30,7 +30,7 @@ final class PlaceOrderAction
     public function __construct(
         private readonly AddOrderItemAction $addItem,
         private readonly ReserveStockAction $reserveStock,
-        private readonly ClearCart $clearCart,
+        private readonly ClearCartAction $clearCart,
         private readonly CouponManager $coupons,
         private readonly DiscountResolver $discounts,
     ) {}

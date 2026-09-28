@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Shops\Actions\Orders\QuoteShippingAction;
 use RoundlyConsulting\Shops\Contracts\ShippingMethod;
-use RoundlyConsulting\Shops\Orders\Actions\QuoteShippingAction;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;

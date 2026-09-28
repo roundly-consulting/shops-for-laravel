@@ -3,15 +3,15 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Money\Money;
-use RoundlyConsulting\Shops\Cart\Actions\AddToCart;
-use RoundlyConsulting\Shops\Cart\Actions\UpdateCartItem;
+use RoundlyConsulting\Shops\Actions\Cart\AddToCartAction;
+use RoundlyConsulting\Shops\Actions\Cart\UpdateCartItemAction;
+use RoundlyConsulting\Shops\Actions\Inventory\AdjustStockAction;
+use RoundlyConsulting\Shops\Actions\Orders\AddOrderItemAction;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Cart\CartItem;
 use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;
-use RoundlyConsulting\Shops\Inventory\Actions\AdjustStockAction;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 use RoundlyConsulting\Shops\Inventory\StockAdjustment;
-use RoundlyConsulting\Shops\Orders\Actions\AddOrderItemAction;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
@@ -68,7 +68,7 @@ it('refuses a cart line beyond the quantity column range', function (): void {
 });
 
 it('refuses a non-positive quantity through the AddToCart action', function (): void {
-    expect(fn () => app(AddToCart::class)->execute(quantityCart(), quantityVariant(), 0))
+    expect(fn () => app(AddToCartAction::class)->execute(quantityCart(), quantityVariant(), 0))
         ->toThrow(InvalidQuantityException::class);
 });
 
@@ -76,11 +76,11 @@ it('removes a cart line set to zero but refuses a negative or out-of-range quant
     $cart = quantityCart();
     $item = $cart->add(quantityVariant(), 2);
 
-    expect(fn () => app(UpdateCartItem::class)->execute($item, -1))->toThrow(InvalidQuantityException::class)
-        ->and(fn () => app(UpdateCartItem::class)->execute($item, Quantity::MAX + 1))->toThrow(InvalidQuantityException::class)
+    expect(fn () => app(UpdateCartItemAction::class)->execute($cart, $item, -1))->toThrow(InvalidQuantityException::class)
+        ->and(fn () => app(UpdateCartItemAction::class)->execute($cart, $item, Quantity::MAX + 1))->toThrow(InvalidQuantityException::class)
         ->and($item->refresh()->quantity)->toBe(2)
         // Zero is the documented "remove this line".
-        ->and(app(UpdateCartItem::class)->execute($item, 0))->toBeNull()
+        ->and(app(UpdateCartItemAction::class)->execute($cart, $item, 0))->toBeNull()
         ->and($cart->items()->count())->toBe(0);
 });
 

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
-use RoundlyConsulting\Shops\Inventory\Actions\AdjustStockAction;
+use RoundlyConsulting\Shops\Actions\Inventory\AdjustStockAction;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 use RoundlyConsulting\Shops\Inventory\Events\StockAdjusted;
 use RoundlyConsulting\Shops\Inventory\Events\StockRanLow;

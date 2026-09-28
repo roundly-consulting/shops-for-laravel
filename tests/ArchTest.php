@@ -6,19 +6,22 @@ use RoundlyConsulting\Coupons\Models\Coupon;
 use RoundlyConsulting\Shops\Exceptions\ShopsException;
 use RoundlyConsulting\Shops\Orders\NumberGenerators\DefaultNumberGenerator;
 use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\ShopsManager;
 use RoundlyConsulting\Testing\Arch\ArchPresets;
 
 // ── Shared presets ───────────────────────────────────────────────────────────
 
 ArchPresets::strictTypes('RoundlyConsulting\Shops');
 
-// Three intentional extension points are exempt: Shop, which `shops.shop_model`
+// Four intentional extension points are exempt: Shop, which `shops.shop_model`
 // invites a host to subclass (pinned by the preset below instead); ShopsException,
-// the base every shop error extends so a host can catch them uniformly; and
+// the base every shop error extends so a host can catch them uniformly;
 // DefaultNumberGenerator, which `shops.orders.number_generator` invites a host to
-// extend rather than reimplement the whole NumberGenerator contract.
+// extend rather than reimplement the whole NumberGenerator contract; and ShopsManager,
+// the facade root `ShopsFake` extends — a fake that is not a subtype of the manager
+// would TypeError every constructor-injected ShopsManager under `Shops::fake()`.
 ArchPresets::finalByDefault('RoundlyConsulting\Shops')
-    ->ignoring([Shop::class, ShopsException::class, DefaultNumberGenerator::class]);
+    ->ignoring([Shop::class, ShopsException::class, DefaultNumberGenerator::class, ShopsManager::class]);
 
 // The counter-weight, and shops' own bug #19: `final class Shop` was a PHP fatal
 // the moment a host used the documented `shops.shop_model` seam. Coupon is the
@@ -52,7 +55,24 @@ ArchPresets::runtimeRequireIsWhitelisted(__DIR__.'/../composer.json');
 
 ArchPresets::noDebuggingLeftovers();
 
+// One path into behaviour: model convenience methods and model traits reach actions through
+// ShopsManager, so `Shops::fake()` sees `$cart->add()` and `$order->markPaid()`.
+ArchPresets::modelsGoThroughTheFacade('RoundlyConsulting\Shops');
+
 // ── shops-specific rules the presets don't express ────────────────────────────
+
+// The preset above scans `Shops\Models|Concerns|Traits`. Shops groups its models by domain
+// (`Cart\Cart`, `Orders\Order`, `Products\ProductVariant`, `Shops\Shop`,
+// `Inventory\StockAdjustment`) with their traits beside them, so the preset alone guards only
+// the shared `Shops\Concerns`. This extends the same rule to the domain namespaces; the
+// handles and the manager, which are the path, live outside them. One rule per namespace:
+// Pest's `->not->toUse()` over a multi-element `expect([...])` fails only when every subject
+// uses the target, so a single offender would slip through a combined rule.
+foreach (['Cart', 'Inventory', 'Orders', 'Products', 'Shops'] as $domain) {
+    arch("{$domain} models and traits reach actions only through the manager")
+        ->expect("RoundlyConsulting\\Shops\\{$domain}")
+        ->not->toUse('RoundlyConsulting\Shops\Actions');
+}
 
 arch('src only uses allowed vendor roots')
     ->expect('RoundlyConsulting\Shops')
@@ -85,28 +105,24 @@ arch('src only uses allowed vendor roots')
         'resolve',
         'blank',
         '__',
-    ]);
+    ])
+    // ShopsFake asserts with PHPUnit, which every Laravel app has in require-dev; src/Testing
+    // is only loaded by a host's test suite. Pest's arch layer cannot match a PHPUnit class
+    // as an allowed root, so it is named here, exactly — nothing else from PHPUnit is permitted.
+    ->ignoring('PHPUnit\Framework\Assert');
 
 it('exposes a single public execute method on every action', function (): void {
-    $actions = collect(glob(__DIR__.'/../src/**/Actions/*.php') ?: [])
-        ->merge(glob(__DIR__.'/../src/*/Actions/*.php') ?: [])
-        ->map(fn (string $path): string => basename($path, '.php'))
-        ->unique();
+    $paths = collect(shopsPhpFilesIn(__DIR__.'/../src/Actions'));
 
-    expect($actions)->not->toBeEmpty();
+    // Pinned by count so the scan cannot silently cover nothing.
+    expect($paths)->toHaveCount(12);
 
-    foreach (collect(glob(__DIR__.'/../src/*/Actions/*.php') ?: []) as $path) {
-        $contents = (string) file_get_contents($path);
+    foreach ($paths as $file) {
+        $contents = (string) file_get_contents($file->getPathname());
 
-        if (! preg_match('/namespace (.+);/', $contents, $ns)) {
-            continue;
-        }
+        expect(preg_match('/^namespace (.+);/m', $contents, $ns))->toBe(1);
 
-        $class = $ns[1].'\\'.basename($path, '.php');
-
-        if (! class_exists($class)) {
-            continue;
-        }
+        $class = $ns[1].'\\'.$file->getBasename('.php');
 
         $publicMethods = array_filter(
             (new ReflectionClass($class))->getMethods(ReflectionMethod::IS_PUBLIC),

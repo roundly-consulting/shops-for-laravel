@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Shops\Orders\Actions;
+namespace RoundlyConsulting\Shops\Actions\Orders;
 
-use RoundlyConsulting\Shops\Inventory\Actions\AdjustStockAction;
+use RoundlyConsulting\Shops\Actions\Inventory\AdjustStockAction;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 use RoundlyConsulting\Shops\Orders\Order;
 
@@ -13,6 +13,11 @@ use RoundlyConsulting\Shops\Orders\Order;
  * canceled (`sell: false` — quantity returns to availability) or fulfilled
  * (`sell: true` — the reservation is converted into an actual sale, decrementing
  * on-hand stock).
+ *
+ * Building block of the cancel/fulfil transitions ({@see TransitionOrderStatusAction}); not on
+ * the facade.
+ *
+ * @internal
  */
 final class ReleaseStockAction
 {

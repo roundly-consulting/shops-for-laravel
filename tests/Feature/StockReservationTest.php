@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Shops\Actions\Orders\AddOrderItemAction;
+use RoundlyConsulting\Shops\Actions\Orders\ReserveStockAction;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
-use RoundlyConsulting\Shops\Orders\Actions\AddOrderItemAction;
-use RoundlyConsulting\Shops\Orders\Actions\ReserveStockAction;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 

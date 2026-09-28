@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
-use RoundlyConsulting\Shops\Orders\Actions\TransitionOrderStatusAction;
+use RoundlyConsulting\Shops\Actions\Orders\TransitionOrderStatusAction;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderCanceled;
 use RoundlyConsulting\Shops\Orders\Events\OrderFulfilled;

@@ -6,7 +6,7 @@ namespace RoundlyConsulting\Shops\Orders\DataTransferObjects;
 
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Addresses\Contracts\Addressable;
-use RoundlyConsulting\Shops\Orders\AddressBook;
+use RoundlyConsulting\Shops\ShopsManager;
 
 final readonly class PlaceOrderData
 {
@@ -29,11 +29,11 @@ final readonly class PlaceOrderData
         ?string $note = null,
         ?bool $billingSameAsShipping = null,
     ): self {
-        $defaults = app(AddressBook::class)->defaults($customer, $billingSameAsShipping);
+        $defaults = app(ShopsManager::class)->addresses()->defaults($customer, $billingSameAsShipping);
 
         return new self(
-            billing: $defaults['billing'],
-            shipping: $defaults['shipping'],
+            billing: $defaults->billing,
+            shipping: $defaults->shipping,
             couponCode: $couponCode,
             note: $note,
             customer: $customer,

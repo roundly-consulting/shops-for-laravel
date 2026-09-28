@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
 use RoundlyConsulting\Money\Money;
-use RoundlyConsulting\Shops\Orders\Actions\AddOrderItemAction;
+use RoundlyConsulting\Shops\Actions\Orders\AddOrderItemAction;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;

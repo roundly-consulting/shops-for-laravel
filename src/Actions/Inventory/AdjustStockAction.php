@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Shops\Inventory\Actions;
+namespace RoundlyConsulting\Shops\Actions\Inventory;
 
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Shops\Orders\Actions;
+namespace RoundlyConsulting\Shops\Actions\Orders;
 
-use RoundlyConsulting\Shops\Inventory\Actions\AdjustStockAction;
+use RoundlyConsulting\Shops\Actions\Inventory\AdjustStockAction;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Orders\Order;
@@ -13,6 +13,10 @@ use RoundlyConsulting\Shops\Orders\Order;
  * Reserves each order line's quantity against its variant's stock. The whole
  * reservation runs in one transaction, so an oversell on any line rolls back
  * every reservation and leaves stock untouched.
+ *
+ * Building block of checkout ({@see PlaceOrderAction}); not on the facade.
+ *
+ * @internal
  */
 final class ReserveStockAction
 {

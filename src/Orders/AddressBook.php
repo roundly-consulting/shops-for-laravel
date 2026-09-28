@@ -8,6 +8,7 @@ use RoundlyConsulting\Addresses\Address as AddressModel;
 use RoundlyConsulting\Addresses\Contracts\Addressable;
 use RoundlyConsulting\Addresses\Enums\AddressType;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
+use RoundlyConsulting\Shops\Orders\DataTransferObjects\OrderAddresses;
 
 /**
  * Builds an order's billing/shipping snapshot from a customer's saved addresses
@@ -16,16 +17,17 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
  * back to the shipping address when "billing same as shipping" is on and no
  * billing address exists. The shops order keeps snapshotting these as value
  * objects (no foreign key to the address book).
+ *
+ * Returned by `Shops::addresses()`.
  */
 final class AddressBook
 {
     /**
      * Resolve the customer's default shipping and billing addresses, mapped to
-     * shops Address value objects.
-     *
-     * @return array{shipping: ?Address, billing: ?Address}
+     * shops Address value objects. `$billingSameAsShipping` defaults to
+     * `shops.addresses.billing_same_as_shipping`.
      */
-    public function defaults(Addressable $customer, ?bool $billingSameAsShipping = null): array
+    public function defaults(Addressable $customer, ?bool $billingSameAsShipping = null): OrderAddresses
     {
         $billingSameAsShipping ??= (bool) config('shops.addresses.billing_same_as_shipping', true);
 
@@ -36,7 +38,7 @@ final class AddressBook
             $billing = $shipping;
         }
 
-        return ['shipping' => $shipping, 'billing' => $billing];
+        return new OrderAddresses(billing: $billing, shipping: $shipping);
     }
 
     /**

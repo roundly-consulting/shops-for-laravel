@@ -16,7 +16,7 @@ use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Database\Factories\OrderFactory;
-use RoundlyConsulting\Shops\Orders\Actions\TransitionOrderStatusAction;
+use RoundlyConsulting\Shops\Handles\OrderHandle;
 use RoundlyConsulting\Shops\Orders\Concerns\HasCoupon;
 use RoundlyConsulting\Shops\Orders\Concerns\HasCustomer;
 use RoundlyConsulting\Shops\Orders\Concerns\HasItems;
@@ -26,8 +26,10 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
+use RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException;
 use RoundlyConsulting\Shops\Shops\CurrentShop;
 use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\ShopsManager;
 use RoundlyConsulting\Shops\Support\Casts\AddressCast;
 
 /**
@@ -137,33 +139,61 @@ final class Order extends Model
         return 'number';
     }
 
+    /**
+     * Move the order to a status — the same as `Shops::order($order)->transition($status)`.
+     *
+     * @throws IllegalStatusTransitionException
+     */
     public function transitionTo(Status $status): self
     {
-        return resolve(TransitionOrderStatusAction::class)->execute($this, $status);
+        return $this->shops()->transition($status);
     }
 
+    /**
+     * @throws IllegalStatusTransitionException
+     */
     public function markInProgress(): self
     {
-        return $this->transitionTo(Status::InProgress);
+        return $this->shops()->transition(Status::InProgress);
     }
 
+    /**
+     * @throws IllegalStatusTransitionException
+     */
     public function markPaid(): self
     {
-        return $this->transitionTo(Status::Paid);
+        return $this->shops()->transition(Status::Paid);
     }
 
+    /**
+     * @throws IllegalStatusTransitionException
+     */
     public function markFulfilled(): self
     {
-        return $this->transitionTo(Status::Fulfilled);
+        return $this->shops()->fulfil();
     }
 
+    /**
+     * @throws IllegalStatusTransitionException
+     */
     public function cancel(): self
     {
-        return $this->transitionTo(Status::Canceled);
+        return $this->shops()->cancel();
     }
 
+    /**
+     * @throws IllegalStatusTransitionException
+     */
     public function refund(): self
     {
-        return $this->transitionTo(Status::Refunded);
+        return $this->shops()->refund();
+    }
+
+    /**
+     * The model convenience methods go through the manager, so `Shops::fake()` sees them.
+     */
+    private function shops(): OrderHandle
+    {
+        return app(ShopsManager::class)->order($this);
     }
 }

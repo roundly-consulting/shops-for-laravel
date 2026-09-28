@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Shops\Orders\Actions;
+namespace RoundlyConsulting\Shops\Actions\Orders;
 
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderCanceled;

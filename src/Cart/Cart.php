@@ -23,7 +23,7 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Shops\Shop;
-use RoundlyConsulting\Shops\Support\Quantity;
+use RoundlyConsulting\Shops\ShopsManager;
 
 /**
  * @property int $id
@@ -69,43 +69,15 @@ final class Cart extends Model
     }
 
     /**
-     * Add a variant to the cart, snapshotting its price/sku and incrementing the
-     * quantity when the same variant is already present.
+     * Add a variant to the cart — the same as `Shops::cart($cart)->add($variant, $quantity)`:
+     * its price and sku are snapshotted, and a variant already in the cart increments its line.
      *
      * @throws InvalidQuantityException when the quantity (or the merged line) is not 1..Quantity::MAX.
      * @throws CurrencyMismatch when the variant is priced in another currency than the cart.
      */
     public function add(ProductVariant $variant, int $quantity = 1): CartItem
     {
-        Quantity::assertValid($quantity);
-
-        if (! $variant->price->currency()->equals($this->currency)) {
-            throw CurrencyMismatch::between($this->currency, $variant->price->currency());
-        }
-
-        $existing = $this->items()->where('product_variant_id', $variant->id)->first();
-
-        if ($existing !== null) {
-            // The merged line must still be a valid quantity (the model guard refuses it too).
-            Quantity::assertValid($existing->quantity + $quantity);
-
-            $existing->increment('quantity', $quantity);
-
-            return $existing->refresh();
-        }
-
-        $item = new CartItem([
-            'product_variant_id' => $variant->id,
-            'name' => $variant->name ?? $variant->product->name,
-            'sku' => $variant->sku,
-            'quantity' => $quantity,
-            'price' => $variant->price, // the cast writes the item's currency column
-            'tax_class' => $variant->tax_class,
-        ]);
-
-        $this->items()->save($item);
-
-        return $item;
+        return app(ShopsManager::class)->cart($this)->add($variant, $quantity);
     }
 
     public function subtotal(): Money

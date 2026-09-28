@@ -7,7 +7,7 @@ use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
 use RoundlyConsulting\Money\Exceptions\InvalidMoneyValue;
 use RoundlyConsulting\Money\Money;
-use RoundlyConsulting\Shops\Orders\Actions\AddOrderItemAction;
+use RoundlyConsulting\Shops\Actions\Orders\AddOrderItemAction;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Shops\CurrentShop;

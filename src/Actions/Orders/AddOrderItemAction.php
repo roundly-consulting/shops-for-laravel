@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Shops\Orders\Actions;
+namespace RoundlyConsulting\Shops\Actions\Orders;
 
 use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
 use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;
@@ -16,6 +16,10 @@ use RoundlyConsulting\Shops\Support\Quantity;
  * name, sku, price, and tax class — and the tax rate that class resolves to for the
  * order's shop and destination — at purchase time, so later catalog or tax-rate changes
  * never alter a placed order. Enforces the order's own (snapshotted) currency.
+ *
+ * Building block of checkout ({@see PlaceOrderAction}); not on the facade.
+ *
+ * @internal
  */
 final class AddOrderItemAction
 {

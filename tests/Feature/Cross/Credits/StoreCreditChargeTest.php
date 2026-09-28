@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Credits\Facades\Credits;
 use RoundlyConsulting\Money\Money;
+use RoundlyConsulting\Shops\Actions\Orders\ChargeOrderAction;
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
-use RoundlyConsulting\Shops\Orders\Actions\ChargeOrderAction;
+use RoundlyConsulting\Shops\Facades\Shops;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
@@ -115,4 +117,16 @@ it('never reports a negative gateway amount', function (): void {
     $order->forceFill(['store_credit_applied' => Money::ofMinor(1500, 'EUR')])->save();
 
     expect((string) $order->refresh()->gatewayAmount())->toBe('0.00 EUR');
+});
+
+it('lets a credits fake record the store credit a charge debits', function (): void {
+    $order = creditedOrder(credit: 400);
+    $credits = Credits::fake();
+
+    $result = Shops::order($order)->charge();
+
+    $credits->assertDeducted($order->customer, 400, 'store_credit');
+
+    expect($result->successful)->toBeTrue()
+        ->and($order->refresh()->store_credit_applied?->minor())->toBe('400');
 });

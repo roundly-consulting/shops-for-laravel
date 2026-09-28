@@ -15,7 +15,7 @@ use RoundlyConsulting\Shops\Payments\NullPaymentGateway;
 use RoundlyConsulting\Shops\Reviews\Contracts\VerifiedPurchaseResolver;
 use RoundlyConsulting\Shops\Reviews\NullVerifiedPurchaseResolver;
 use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;
-use RoundlyConsulting\Shops\ShopManager;
+use RoundlyConsulting\Shops\ShopsManager;
 use RoundlyConsulting\Shops\ShopsServiceProvider;
 use RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver;
 
@@ -26,7 +26,7 @@ it('binds the configured implementations', function (): void {
         ->and(app(ShippingMethod::class))->toBeInstanceOf(FreeShippingMethod::class)
         ->and(app(DiscountResolver::class))->toBeInstanceOf(CouponPackageDiscountResolver::class)
         ->and(app(VerifiedPurchaseResolver::class))->toBeInstanceOf(NullVerifiedPurchaseResolver::class)
-        ->and(app(ShopManager::class))->toBe(app(ShopManager::class));
+        ->and(app(ShopsManager::class))->toBe(app(ShopsManager::class));
 });
 
 it('publishes the config file under the shops-config tag', function (): void {
