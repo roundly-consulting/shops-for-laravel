@@ -12,17 +12,20 @@ use RoundlyConsulting\Shops\Orders\Events\OrderRefunded;
 use RoundlyConsulting\Shops\Orders\Events\OrderStatusChanged;
 use RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException;
 use RoundlyConsulting\Shops\Orders\Order;
+use RoundlyConsulting\Shops\Payments\StoreCreditTender;
 
 /**
  * Moves an order from its current status to a new one, enforcing the allowed
  * transition map, stamping the matching timestamp column, persisting the
  * change, and firing the generic and status-specific events. The current status is
  * read under the order's row lock, so two requests can never both make the same move.
+ * Canceling also returns any store credit applied to the order to the buyer.
  */
 final class TransitionOrderStatusAction
 {
     public function __construct(
         private readonly ReleaseStockAction $releaseStock,
+        private readonly StoreCreditTender $storeCredit,
     ) {}
 
     public function execute(Order $order, Status $to): Order
@@ -45,6 +48,11 @@ final class TransitionOrderStatusAction
             $order->save();
 
             $this->settleStock($order, $to);
+
+            if ($to === Status::Canceled) {
+                // A canceled order was never paid: hand back any store credit applied to it.
+                $this->storeCredit->restore($order);
+            }
 
             return $from;
         });
