@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Orders;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -47,6 +48,26 @@ final class Item extends Model
     protected static function newFactory(): ItemFactory
     {
         return ItemFactory::new();
+    }
+
+    /**
+     * An item belongs to its order's shop: inherit the order's `shop_id` on insert unless one
+     * was set explicitly. Done here, before the `creating` listeners run, so the order's shop
+     * wins over a bound CurrentShop — and it holds under `Event::fake()` too.
+     *
+     * @param  Builder<static>  $query
+     */
+    protected function performInsert(Builder $query): bool
+    {
+        if ($this->getAttribute('shop_id') === null) {
+            $order = $this->getRelationValue('order');
+
+            if ($order instanceof Order && $order->shop_id !== null) {
+                $this->setAttribute('shop_id', $order->shop_id);
+            }
+        }
+
+        return parent::performInsert($query);
     }
 
     /**
