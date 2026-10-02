@@ -6,47 +6,33 @@ namespace RoundlyConsulting\Shops\Products\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use RoundlyConsulting\MediaLibrary\Buckets\MediaBucket;
-use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
-use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * First-class catalog media for the bundled Product model, built on
  * roundly-consulting/media-library-for-laravel.
  *
- * Declares a single `featured` image and a multi-image `gallery`, both stored
- * with public visibility by default (catalog imagery is served over a CDN for
- * SEO) with a responsive width ladder. Adds product-specific readers for the
- * featured image, the gallery, and an SEO/JSON-LD image that falls back to the
- * first gallery image when no featured image is set.
+ * Declares a single `featured` image and a multi-image `gallery`, both configured from
+ * `shops.media` ({@see ConfiguresCatalogMedia}: public by default — catalog imagery is served
+ * over a CDN for SEO — with a responsive width ladder and the size cap). Adds product-specific
+ * readers for the featured image, the gallery, and an SEO/JSON-LD image that falls back to the
+ * first gallery image when no featured image is set. A reader asked for a variant that is not
+ * generated serves the original.
  *
  * @mixin Model
  */
 trait HasProductMedia
 {
-    use InteractsWithMedia;
-
-    /** Web image formats accepted by the catalog buckets. */
-    private const IMAGE_MIME_TYPES = [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-        'image/gif',
-        'image/avif',
-    ];
+    use ConfiguresCatalogMedia;
 
     public function registerMediaBuckets(): void
     {
-        $this->configureMediaBucket(
-            $this->addMediaBucket($this->featuredBucket())
-                ->singleFile()
-                ->acceptsMimeTypes(self::IMAGE_MIME_TYPES),
+        $this->configureCatalogMediaBucket(
+            $this->addMediaBucket($this->featuredBucket())->singleFile(),
         );
 
-        $this->configureMediaBucket(
-            $this->addMediaBucket($this->galleryBucket())
-                ->acceptsMimeTypes(self::IMAGE_MIME_TYPES),
+        $this->configureCatalogMediaBucket(
+            $this->addMediaBucket($this->galleryBucket()),
         );
     }
 
@@ -57,7 +43,7 @@ trait HasProductMedia
 
     public function featuredImageUrl(string $variant = ''): string
     {
-        return $this->getFirstMediaUrl($this->featuredBucket(), $variant);
+        return $this->catalogMediaUrl($this->featuredBucket(), $this->featuredImage(), $variant);
     }
 
     /** @return Collection<int, Media> */
@@ -71,7 +57,7 @@ trait HasProductMedia
     {
         return array_values(
             $this->galleryImages()
-                ->map(fn (Media $media): string => $media->getUrl($variant))
+                ->map(fn (Media $media): string => $this->catalogMediaUrl($this->galleryBucket(), $media, $variant))
                 ->all(),
         );
     }
@@ -100,51 +86,5 @@ trait HasProductMedia
     public function galleryBucket(): string
     {
         return (string) config('shops.media.gallery_bucket', 'gallery');
-    }
-
-    private function configureMediaBucket(MediaBucket $bucket): MediaBucket
-    {
-        $disk = config('shops.media.disk');
-
-        if (is_string($disk) && $disk !== '') {
-            $bucket->useDisk($disk);
-        }
-
-        if (Config::boolean('shops.media.public', true)) {
-            $bucket->public();
-        } else {
-            $bucket->private();
-        }
-
-        $widths = config('shops.media.responsive_widths');
-
-        $bucket->responsiveWidths(
-            is_array($widths) ? $this->normalizeWidths($widths) : null,
-        );
-
-        $maxSize = config('shops.media.max_file_size');
-
-        if (is_int($maxSize) && $maxSize > 0) {
-            $bucket->maxFileSize($maxSize);
-        }
-
-        return $bucket;
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $widths
-     * @return list<int>
-     */
-    private function normalizeWidths(array $widths): array
-    {
-        $clean = [];
-
-        foreach ($widths as $width) {
-            if (is_int($width) && $width > 0) {
-                $clean[] = $width;
-            }
-        }
-
-        return $clean;
     }
 }

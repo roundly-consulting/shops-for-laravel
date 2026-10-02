@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Http\UploadedFile;
+use RoundlyConsulting\MediaLibrary\Exceptions\FileUnacceptableForBucket;
 use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Products\ProductVariant;
@@ -45,4 +46,37 @@ it('returns an empty banner url when none set', function (): void {
 
     expect($category->bannerUrl())->toBe('')
         ->and($category->banner())->toBeNull();
+});
+
+it('applies shops.media.max_file_size to every catalog bucket', function (string $model): void {
+    config()->set('shops.media.max_file_size', 1024);
+
+    $image = UploadedFile::fake()->image('big.jpg', 400, 400)->size(64); // 64 KB > 1 KB
+
+    $upload = match ($model) {
+        'product' => fn () => ($p = Product::factory()->create())->addMedia($image)->toMediaBucket($p->galleryBucket()),
+        'variant' => fn () => ($v = ProductVariant::factory()->create())->addMedia($image)->toMediaBucket($v->variantGalleryBucket()),
+        'category' => fn () => ($c = Category::factory()->create())->addMedia($image)->toMediaBucket($c->bannerBucket()),
+    };
+
+    expect($upload)->toThrow(FileUnacceptableForBucket::class);
+})->with(['product', 'variant', 'category']);
+
+it('falls back to the original image for a variant that is not generated', function (): void {
+    $product = Product::factory()->create();
+    $variant = ProductVariant::factory()->for($product)->create();
+    $category = Category::factory()->create();
+
+    $product->addMedia(UploadedFile::fake()->image('p.jpg', 64, 64))->toMediaBucket($product->featuredBucket());
+    $product->addMedia(UploadedFile::fake()->image('g.jpg', 64, 64))->toMediaBucket($product->galleryBucket());
+    $variant->addMedia(UploadedFile::fake()->image('v.jpg', 64, 64))->toMediaBucket($variant->variantGalleryBucket());
+    $category->addMedia(UploadedFile::fake()->image('c.jpg', 64, 64))->toMediaBucket($category->bannerBucket());
+
+    // A 64 px image yields no responsive-1600 (no upscaling): every reader serves the original.
+    expect($product->featuredImageUrl('responsive-1600'))->toBe($product->featuredImageUrl())
+        ->and($product->galleryUrls('responsive-1600'))->toBe($product->galleryUrls())
+        ->and($product->seoImageUrl('responsive-1600'))->toBe($product->featuredImageUrl())
+        ->and($variant->variantImageUrl('responsive-1600'))->toBe($variant->variantImageUrl())
+        ->and($variant->variantImageUrls('responsive-1600'))->toBe($variant->variantImageUrls())
+        ->and($category->bannerUrl('responsive-1600'))->toBe($category->bannerUrl());
 });
