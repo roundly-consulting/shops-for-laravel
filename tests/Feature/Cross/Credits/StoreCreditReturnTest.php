@@ -11,6 +11,7 @@ use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\PaymentResult;
 use RoundlyConsulting\Shops\Payments\StoreCreditTender;
+use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\Tests\Fixtures\Customer;
 
 /**
@@ -130,4 +131,15 @@ it('returns nothing for an order without store credit', function (): void {
     [$order] = creditReturnOrder();
 
     expect(app(StoreCreditTender::class)->restore($order))->toBeNull();
+});
+
+it('charges a buyer that is not Creditable in full, applying no credit', function (): void {
+    $order = Order::factory()->create();
+    $order->customer()->associate(Shop::factory()->create())->save();
+    Item::factory()->for($order)->withEurPrice('1000')->state(['quantity' => 1, 'tax_class' => 'zero'])->create();
+
+    $result = Shops::order($order->refresh())->charge();
+
+    expect((string) $result->amount)->toBe('10.00 EUR')
+        ->and($order->refresh()->store_credit_applied)->toBeNull();
 });

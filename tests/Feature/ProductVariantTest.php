@@ -116,3 +116,18 @@ it('carries its column defaults before it is re-read from the database', functio
     expect($cart->add($variant)->tax_class)->toBe('standard')
         ->and(app(AddOrderItemAction::class)->execute($order, $variant)->tax_class)->toBe('standard');
 });
+
+it('keeps the auto default variant next to explicit ones, as the README shows', function (): void {
+    config()->set('shops.pricing.default_currency', 'EUR');
+    $product = Product::create(['name' => 'Sparkling Water']);
+
+    $small = $product->defaultVariant;
+    $small?->update(['sku' => 'WATER-0.5L', 'price' => Money::ofMinor(199, 'EUR'), 'stock' => 50]);
+    $product->variants()->create([
+        'sku' => 'WATER-1L', 'price' => Money::ofMinor(299, 'EUR'), 'stock' => 30, 'position' => 1,
+    ]);
+
+    expect($product->variants()->count())->toBe(2)
+        ->and((string) $product->price)->toBe('1.99 EUR')
+        ->and($product->refresh()->defaultVariant?->sku)->toBe('WATER-0.5L');
+});
