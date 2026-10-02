@@ -12,9 +12,10 @@ use RoundlyConsulting\Shops\Support\ShopModel;
 /**
  * Holds the shop that owns records created in the current container context.
  *
- * Bound as a singleton so a host can set the active tenant once (per request,
- * job, or scoped block) and have {@see BelongsToShop}
- * auto-fill `shop_id` on new owned records. An explicitly set `shop_id` always
+ * Bound as a scoped instance so a host can set the active tenant once per request, job, or
+ * scoped block and have {@see BelongsToShop} auto-fill `shop_id` on new owned records — and
+ * so the binding is dropped between requests (Octane) and before each queued job: a tenant
+ * set in one never leaks into the next. An explicitly set `shop_id` always
  * wins; with nothing bound, nothing is auto-filled.
  *
  * Returned by `Shops::current()`.

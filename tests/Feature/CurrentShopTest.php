@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Shops\Facades\Shops;
+use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\Shops\CurrentShop;
 use RoundlyConsulting\Shops\Shops\Shop;
 
@@ -64,4 +66,19 @@ it('exposes the bound shop through the static helper', function (): void {
     app(CurrentShop::class)->set($shop);
 
     expect(Shop::current()?->is($shop))->toBeTrue();
+});
+
+it('starts every request and queued job without a current shop', function (): void {
+    $shop = Shop::factory()->create();
+
+    Shops::current()->set($shop);
+
+    expect(Shops::current()->id())->toBe($shop->getKey())
+        ->and(app(CurrentShop::class))->toBe(app(CurrentShop::class));
+
+    // What Octane does between requests and the queue worker before each job.
+    app()->forgetScopedInstances();
+
+    expect(Shops::current()->id())->toBeNull()
+        ->and(Product::factory()->create()->shop_id)->toBeNull();
 });

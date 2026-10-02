@@ -74,7 +74,9 @@ final class ShopsServiceProvider extends PackageServiceProvider
     {
         parent::register();
 
-        $this->app->singleton(CurrentShop::class);
+        // Scoped, not a singleton: Octane flushes it between requests and the queue worker
+        // before each job, so one request's tenant never leaks into the next.
+        $this->app->scoped(CurrentShop::class);
         $this->app->singleton(ShopsManager::class);
 
         $this->bindFromConfig(NumberGenerator::class, 'shops.orders.number_generator', DefaultNumberGenerator::class);
