@@ -47,7 +47,7 @@ final class TransitionOrderStatusAction
 
             $order->save();
 
-            $this->settleStock($order, $to);
+            $this->settleStock($order, $from, $to);
 
             if ($to === Status::Canceled) {
                 // A canceled order was never paid: hand back any store credit applied to it.
@@ -84,14 +84,17 @@ final class TransitionOrderStatusAction
     }
 
     /**
-     * Canceling releases held stock back to availability; fulfilling converts
-     * the reservation into a real sale (decrementing on-hand stock).
+     * Canceling — and refunding an order that was paid but never fulfilled — releases held
+     * stock back to availability; fulfilling converts the reservation into a real sale
+     * (decrementing on-hand stock). Refunding a fulfilled order leaves stock alone: the goods
+     * shipped, and a return is booked through the inventory handle.
      */
-    private function settleStock(Order $order, Status $to): void
+    private function settleStock(Order $order, Status $from, Status $to): void
     {
-        match ($to) {
-            Status::Canceled => $this->releaseStock->execute($order, sell: false),
-            Status::Fulfilled => $this->releaseStock->execute($order, sell: true),
+        match (true) {
+            $to === Status::Canceled,
+            $to === Status::Refunded && $from === Status::Paid => $this->releaseStock->execute($order, sell: false),
+            $to === Status::Fulfilled => $this->releaseStock->execute($order, sell: true),
             default => null,
         };
     }

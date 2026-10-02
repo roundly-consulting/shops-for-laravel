@@ -79,3 +79,26 @@ it('skips release for order lines without a variant on cancel', function () use 
     // The detached line is ignored, so its reservation stays held.
     expect($variant->refresh()->reserved)->toBe(2);
 });
+
+it('releases the reservation when a paid, unfulfilled order is refunded', function () use ($orderWithVariant): void {
+    $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 5]);
+    $order = $orderWithVariant($variant, 2);
+    app(ReserveStockAction::class)->execute($order);
+
+    $order->markInProgress()->markPaid()->refund();
+
+    // Refunded before shipping: nothing left the warehouse, so the hold goes back.
+    expect($variant->refresh())->reserved->toBe(0)->stock->toBe(5)
+        ->and($variant->availableStock())->toBe(5);
+});
+
+it('leaves stock alone when a fulfilled order is refunded', function () use ($orderWithVariant): void {
+    $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 5]);
+    $order = $orderWithVariant($variant, 2);
+    app(ReserveStockAction::class)->execute($order);
+
+    $order->markInProgress()->markPaid()->markFulfilled()->refund();
+
+    // The goods shipped; a return is booked with Shops::inventory($variant)->returned().
+    expect($variant->refresh())->reserved->toBe(0)->stock->toBe(3);
+});
