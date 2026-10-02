@@ -10,10 +10,13 @@ use RoundlyConsulting\Coupons\Exceptions\CouponNotRedeemable;
 use RoundlyConsulting\Shops\Actions\Cart\ClearCartAction;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
+use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
+use RoundlyConsulting\Shops\Orders\Exceptions\CheckoutRefusedException;
 use RoundlyConsulting\Shops\Orders\Order;
+use RoundlyConsulting\Shops\Products\ProductVariant;
 
 /**
  * Converts a cart into a placed order in a single transaction: the order takes the
@@ -23,8 +26,13 @@ use RoundlyConsulting\Shops\Orders\Order;
  * explicit customer) is linked, an optional coupon is redeemed via
  * coupons-for-laravel and its discount snapshotted onto the order, the
  * billing/shipping addresses are stored, the order number is generated, the cart
- * is cleared, and {@see OrderPlaced} is fired. Any oversell rolls the whole thing
- * back and leaves the cart intact.
+ * is cleared, and {@see OrderPlaced} is fired (after commit). Any oversell rolls the whole
+ * thing back and leaves the cart intact.
+ *
+ * The cart row is locked for the whole checkout and its lines are read under that lock, so a
+ * double-submitted checkout places one order: the second finds the cart empty and is refused.
+ * A cart with no lines, or with a line whose variant was deleted or soft-deleted since it was
+ * added, is refused with {@see CheckoutRefusedException} before anything is written.
  */
 final class PlaceOrderAction
 {
@@ -36,43 +44,61 @@ final class PlaceOrderAction
         private readonly DiscountResolver $discounts,
     ) {}
 
+    /**
+     * @throws CheckoutRefusedException when the cart is empty (also a second, double-submitted
+     *                                  checkout) or a line's variant was (soft-)deleted.
+     * @throws InsufficientStockException when any line would oversell.
+     */
     public function execute(Cart $cart, PlaceOrderData $data = new PlaceOrderData): Order
     {
         return $cart->getConnection()->transaction(function () use ($cart, $data): Order {
+            // One checkout per cart at a time: a double-submitted second checkout waits here,
+            // then finds the cart the first one cleared — and is refused as empty.
+            $locked = $this->lockCart($cart);
+
+            $lines = $cart->items()->with('variant')->get();
+
+            if ($lines->isEmpty()) {
+                throw CheckoutRefusedException::emptyCart($cart);
+            }
+
+            foreach ($lines as $line) {
+                if ($line->variant === null) {
+                    throw CheckoutRefusedException::lineUnavailable($line);
+                }
+            }
+
             $order = new Order([
                 'status' => Status::New,
-                'currency' => $cart->currency,
+                'currency' => $locked->currency,
                 'billing_address' => $data->billing,
                 'shipping_address' => $data->shipping,
                 'note' => $data->note,
             ]);
 
-            $customer = $data->customer ?? $cart->owner;
+            $customer = $data->customer ?? $locked->owner;
 
             if ($customer instanceof Model) {
                 $order->customer()->associate($customer);
             }
 
-            if ($cart->shop_id !== null) {
-                $order->shop_id = $cart->shop_id;
+            if ($locked->shop_id !== null) {
+                $order->shop_id = $locked->shop_id;
             }
 
             $order->save();
 
-            foreach ($cart->items()->with('variant')->get() as $cartItem) {
-                $variant = $cartItem->variant;
-
-                if ($variant === null) {
-                    continue;
-                }
+            foreach ($lines as $line) {
+                /** @var ProductVariant $variant checked above */
+                $variant = $line->variant;
 
                 // The line's own snapshot — the price the customer saw — not today's catalog.
-                $this->addItem->execute($order, $variant, $cartItem->quantity, $cartItem);
+                $this->addItem->execute($order, $variant, $line->quantity, $line);
             }
 
             $this->reserveStock->execute($order);
 
-            $this->redeemCoupon($order, $data->couponCode ?? $cart->coupon_code);
+            $this->redeemCoupon($order, $data->couponCode ?? $locked->coupon_code);
 
             $this->clearCart->execute($cart);
 
@@ -84,6 +110,20 @@ final class PlaceOrderAction
 
             return $order;
         });
+    }
+
+    /**
+     * Lock the cart row and read it as stored — its currency, owner, shop and coupon code are
+     * taken from the locked row, never a stale copy.
+     */
+    private function lockCart(Cart $cart): Cart
+    {
+        $locked = $cart->newQueryWithoutScopes()
+            ->whereKey($cart->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        return $locked instanceof Cart ? $locked : $cart;
     }
 
     /**

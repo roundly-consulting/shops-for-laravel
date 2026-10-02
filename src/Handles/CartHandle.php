@@ -13,6 +13,7 @@ use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
+use RoundlyConsulting\Shops\Orders\Exceptions\CheckoutRefusedException;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\ShopsManager;
@@ -84,9 +85,12 @@ final readonly class CartHandle
     }
 
     /**
-     * Turn the cart into a placed order: lines snapshotted, stock reserved, coupon redeemed,
-     * cart cleared, OrderPlaced fired — all in one transaction.
+     * Turn the cart into a placed order at the prices the cart snapshotted: lines copied, stock
+     * reserved, coupon redeemed, cart cleared, OrderPlaced fired — all in one transaction under
+     * the cart's row lock, so a double-submitted checkout places one order.
      *
+     * @throws CheckoutRefusedException when the cart is empty (a double submit's second call) or
+     *                                  a line's variant was deleted; nothing is written.
      * @throws InsufficientStockException when any line would oversell; nothing is written.
      */
     public function checkout(PlaceOrderData $data = new PlaceOrderData): Order

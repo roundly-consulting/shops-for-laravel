@@ -12,6 +12,7 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderPlaced;
+use RoundlyConsulting\Shops\Orders\Exceptions\CheckoutRefusedException;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Shops\Shop;
@@ -121,15 +122,16 @@ it('rolls back and leaves the cart intact on oversell', function (): void {
         ->and(Order::count())->toBe(0);
 });
 
-it('skips cart lines without a variant', function (): void {
+it('refuses cart lines without a variant instead of dropping them', function (): void {
     $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 10]);
     $cart = Cart::factory()->create();
     $cart->add($variant, 1);
     $cart->items()->first()->update(['product_variant_id' => null]);
 
-    $order = app(PlaceOrderAction::class)->execute($cart);
+    expect(fn () => app(PlaceOrderAction::class)->execute($cart))
+        ->toThrow(CheckoutRefusedException::class);
 
-    expect($order->items()->count())->toBe(0);
+    expect($cart->refresh()->items()->count())->toBe(1);
 });
 
 it('places an order with no addresses and the default data', function (): void {
