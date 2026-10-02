@@ -42,7 +42,7 @@ final class AdjustStockAction
 
             $adjustment = $this->record($locked, $delta, $reason, $reference, $note);
 
-            $variant->setRawAttributes($locked->getAttributes());
+            $this->syncStock($variant, $locked);
 
             StockAdjusted::dispatch($variant, $adjustment);
 
@@ -50,6 +50,25 @@ final class AdjustStockAction
 
             return $adjustment;
         });
+    }
+
+    /**
+     * Copy the ledger-managed columns from the locked row onto the caller's variant as CLEAN
+     * attributes. Copying them dirty (or copying the whole row) would make a later
+     * `$variant->save()` re-write a stock figure another request has since moved on — a lost
+     * sale — and would overwrite the caller's own unsaved edits.
+     */
+    private function syncStock(ProductVariant $variant, ProductVariant $locked): void
+    {
+        $columns = ['stock', 'reserved', $variant->getUpdatedAtColumn()];
+        $attributes = $variant->getAttributes();
+
+        foreach ($columns as $column) {
+            $attributes[$column] = $locked->getAttributes()[$column] ?? null;
+        }
+
+        $variant->setRawAttributes($attributes);
+        $variant->syncOriginalAttributes($columns);
     }
 
     /**

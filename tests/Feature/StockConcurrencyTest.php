@@ -247,3 +247,32 @@ it('never oversells the last unit to two interleaved checkouts', function (): vo
         ->and($state['orderB'])->toBeInstanceOf(Order::class)
         ->and($state['reservedAfterB'])->toBe(1);
 });
+
+it('leaves the caller variant clean, so a later save cannot clobber a concurrent sale', function (): void {
+    $variant = trackedVariant(10);
+
+    Shops::inventory($variant)->receive(5);
+
+    expect($variant->getDirty())->toBe([])
+        ->and($variant->stock)->toBe(15);
+
+    // Another request sells 4 units of the same variant.
+    $other = ProductVariant::query()->findOrFail($variant->getKey());
+    Shops::inventory($other)->adjust(-4, StockReason::Sold);
+
+    // The first request now renames its (older) copy.
+    $variant->update(['name' => 'Renamed']);
+
+    expect($variant->refresh()->stock)->toBe(11)
+        ->and($variant->name)->toBe('Renamed');
+});
+
+it('keeps the caller own unsaved edits on the variant', function (): void {
+    $variant = trackedVariant(10);
+    $variant->name = 'Draft name';
+
+    Shops::inventory($variant)->receive(1);
+
+    expect(array_keys($variant->getDirty()))->toBe(['name'])
+        ->and($variant->stock)->toBe(11);
+});
