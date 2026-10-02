@@ -123,14 +123,36 @@ return [
 | Key | Type | Default | Env | Description |
 |---|---|---|---|---|
 | `shop_model` | `class-string` | `Shops\Shop::class` | `SHOPS_SHOP_MODEL` | The Eloquent tenant model every owned record points at via its `shop_id` foreign key. Swap in your own model to extend it. |
+| `key_type` | `string` | `bigint` | `SHOPS_KEY_TYPE` | Key type of the polymorphic `customer` / `owner` / `reference` columns (orders, carts, stock adjustments): `bigint`, `uuid` or `ulid` — match your customer/owner models' keys. Anything else falls back to `bigint`. Fixed when the migrations first run. |
 | `pricing.price_type` | `string` | `gross` | `SHOPS_PRICE_TYPE` | `gross` (tax is extracted from the stored price) or `net` (tax is added on top). |
 | `pricing.default_currency` | `string` | `EUR` | `SHOPS_DEFAULT_CURRENCY` | ISO-4217 fallback currency: for a shop without its own `currency`, an order without a shop, and a shop-less product's default variant. Carts carry their own currency and orders snapshot theirs. |
 | `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. |
 | `tax.resolver` | `class-string` | `DatabaseTaxResolver::class` | — | Resolves the rate for a `(shop, class, country)` lookup. Defaults to per-shop database rates with the config map as the floor. Bind `ConfigTaxResolver` to use only the config map, or your own `TaxResolver`. |
-| `orders.number_generator` | `class-string` | `DefaultNumberGenerator::class` | — | The class used to generate an order number. Must implement `NumberGenerator`. |
+| `inventory.low_stock_threshold` | `int` | `0` | `SHOPS_LOW_STOCK_THRESHOLD` | `StockRanLow` fires once when an adjustment takes a tracked variant's available stock from above this level to at or below it. |
+| `media.featured_bucket` | `string` | `featured` | `SHOPS_MEDIA_FEATURED_BUCKET` | Product featured-image bucket (single file). |
+| `media.gallery_bucket` | `string` | `gallery` | `SHOPS_MEDIA_GALLERY_BUCKET` | Product gallery bucket. |
+| `media.variant_bucket` | `string` | `gallery` | `SHOPS_MEDIA_VARIANT_BUCKET` | Variant gallery bucket. |
+| `media.banner_bucket` | `string` | `banner` | `SHOPS_MEDIA_BANNER_BUCKET` | Category banner bucket (single file). |
+| `media.disk` | `?string` | `null` (media's disk) | `SHOPS_MEDIA_DISK` | Disk for every catalog bucket. |
+| `media.public` | `bool` | `true` | `SHOPS_MEDIA_PUBLIC` | Public (CDN/SEO) or private catalog media. |
+| `media.responsive_widths` | `list<int>` | `[320, 640, 1024, 1600]` | — | Responsive ladder; each width is generated as the variant `responsive-<width>`. |
+| `media.max_file_size` | `?int` | `null` | — | Per-image cap in bytes, applied to every catalog bucket. |
+| `reviews.verified_purchase_resolver` | `class-string` | `NullVerifiedPurchaseResolver::class` | `SHOPS_VERIFIED_PURCHASE_RESOLVER` | Decides whether a buyer's review is a verified purchase (see [Reviews](#reviews)). |
+| `attributes.definitions` | `array<string,array>` | `[]` | — | Product spec-sheet attribute definitions (see [Spec sheet](#spec-sheet-attributes)). |
+| `locales.fallback` | `string` | `app.fallback_locale` | `SHOPS_FALLBACK_LOCALE` | Locale a translatable attribute falls back to; also the locale the default variant SKU derives from. |
 | `slugs.history` | `bool` | `false` | `SHOPS_SLUG_HISTORY` | Keep retired shop/product/category slugs and answer old URLs with a 301 to the current one. Needs sluggable's published `slug_history` migration. |
+| `payment.gateway` | `class-string` | `NullPaymentGateway::class` | `SHOPS_PAYMENT_GATEWAY` | Your `PaymentGateway`. The default always succeeds without taking money. |
+| `payment.allow_store_credit` | `bool` | `false` | `SHOPS_ALLOW_STORE_CREDIT` | Apply the buyer's store credit before charging the gateway (see [Pay with store credit](#pay-with-store-credit)). |
+| `payment.store_credit_bucket` | `string` | `store_credit` | `SHOPS_STORE_CREDIT_BUCKET` | The credits bucket store credit is taken from and returned to. |
+| `payment.refund_to_store_credit` | `bool` | `false` | `SHOPS_REFUND_TO_STORE_CREDIT` | Grant a refunded order's total back as store credit. |
+| `shipping.method` | `class-string` | `FreeShippingMethod::class` | `SHOPS_SHIPPING_METHOD` | Your `ShippingMethod`; checkout quotes the shipping address through it. |
 | `discounts.coupon_model` | `class-string` | coupons' `Coupon::class` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation: coupons-for-laravel's `Coupon` or your subclass of it (anything else falls back to `Coupon`). |
 | `discounts.resolver` | `class-string` | `CouponPackageDiscountResolver::class` | — | The `DiscountResolver` pricing carts and snapshotting an order's discount at place-order. |
+| `addresses.billing_same_as_shipping` | `bool` | `true` | `SHOPS_BILLING_SAME_AS_SHIPPING` | Reuse the primary shipping address as billing when the customer has no billing address. |
+| `orders.number_generator` | `class-string` | `DefaultNumberGenerator::class` | — | The class used to generate an order number. Must implement `NumberGenerator`. |
+
+The `bool` switches accept `true`/`false`, `1`/`0`, `on`/`off` and `yes`/`no`, so any env
+spelling works.
 
 ## Usage
 
@@ -155,10 +177,10 @@ $order = Shops::cart($cart)->checkout(new PlaceOrderData(couponCode: 'SUMMER'));
 
 // Order
 Shops::order($order)->transition(Status::InProgress);
-Shops::order($order)->charge();                  // PaymentResult — Paid on success
+Shops::order($order)->charge();                  // PaymentResult — Paid on success; New/InProgress only
 Shops::order($order)->fulfil();                  // reservation becomes a sale
-Shops::order($order)->cancel();                  // reservation released
-Shops::order($order)->refund();
+Shops::order($order)->cancel();                  // reservation released, store credit returned
+Shops::order($order)->refund();                  // an unfulfilled order's reservation released too
 Shops::order($order)->quoteShipping($address);   // Money, through the bound ShippingMethod
 
 // Inventory — every change is a StockAdjustment ledger row
@@ -295,15 +317,21 @@ Product::query()->forShop($shop)->get();       // scope by model
 Product::query()->forShop($shop->id)->get();   // or by id
 ```
 
-Swap the tenant model by pointing `shops.shop_model` at your own class.
+The current shop is bound **per request and per queued job** (a scoped binding): Octane drops it
+between requests and the queue worker before each job, so one tenant never leaks into the next —
+set it in a middleware or at the top of a job. Swap the tenant model by pointing
+`shops.shop_model` at your own class.
 
 ### Per-shop tax rates
 
 Each shop owns many `TaxRate` rows. A rate carries a tax class, an optional ISO-3166-1
 alpha-2 country, and a rate in **integer basis points** (1 bp = 0.01%, so `1900` = 19.00%,
 `850` = 8.5%). The default `DatabaseTaxResolver` resolves a `(shop, class, country)` lookup
-through a fallback chain: an exact country match, then the shop's class default, then the
-highest-priority class rate, then the `tax_classes` config floor, then zero.
+through a fallback chain: an exact country match, then the shop's class default (the rate
+flagged `is_default` — a country-less one first, else a country-specific one such as your home
+country's), then the highest-priority class rate, then the `tax_classes` config floor, then
+zero. Countries match case-insensitively (`de` = `DE`), and a rate's country is stored
+upper-cased.
 
 ```php
 use RoundlyConsulting\Shops\Shops\TaxRate;
@@ -324,7 +352,8 @@ $value->percentage()->value();       // "8.5" — money's Percentage
 $value->toTaxRate();                 // money's TaxRate, which does the exact tax math
 $value->isZero();                    // false
 
-app(TaxResolver::class)->rateFor($shop, 'standard');   // shop's default standard rate
+app(TaxResolver::class)->rateFor($shop, 'standard');   // 1900 — DE, the flagged default
+app(TaxResolver::class)->rateFor($shop, 'standard', 'it'); // 1900 — no IT rate: the default
 app(TaxResolver::class)->rateFor(null, 'standard');    // config floor (2000 bp = 20%)
 ```
 
@@ -409,8 +438,11 @@ The default variant's SKU derives from the **fallback-locale** slug (`CHAIR-DEFA
 the same whatever locale the creating request ran under.
 
 **Slug history (opt-in).** Set `SHOPS_SLUG_HISTORY=true` and publish sluggable's migration
-(`php artisan vendor:publish --tag="sluggable-migrations"`) — renamed products keep answering
-their old URL with a 301 to the new one.
+(`php artisan vendor:publish --tag="sluggable-migrations"`) — a product, category or shop whose
+**slug** changes keeps answering its old URL with a 301 to the new one. Renaming does not change
+the slug: a slug is generated once, from the first name, so links stay stable. To move the URL
+with a rename, set the new slug yourself (`$product->setTranslation('slug', 'en',
+'armchair')->save()`) — with history on, the old one redirects.
 
 **Importing existing catalogue data.** Rows imported with duplicate slugs must be fixed before
 the unique slug indexes can be added. Per model (`Shops\Shop`, `Products\Product`,
@@ -429,27 +461,31 @@ Adding a locale later works the same way: `sluggable:regenerate … --locale=de`
 ### Variants, SKUs and options
 
 Every sellable unit is a `ProductVariant` with its own `sku`, `price`, `currency`, tax class,
-and stock. A product created without explicit variants automatically gets **one default
-variant** (a zero price in its shop's currency), so simple single-SKU products stay a
-one-liner; `$product->price` proxies the default variant's price.
+and stock. Every product gets **one default variant** when it is created (`<SLUG>-DEFAULT`, a
+zero price in its shop's currency, no stock) — it is a real, sellable variant, not a
+placeholder that later variants replace. `$product->defaultVariant` and `$product->price` read
+the lowest-position variant, which is that default unless you reorder. So set it up rather than
+leaving it at zero: price it for a simple product, or make it your first option variant and add
+the others next to it:
 
 ```php
 use RoundlyConsulting\Money\Money;
 
-// Add explicit variants:
 // The price cast writes the `currency` column from the Money itself.
-$small = $product->variants()->create([
-    'sku' => 'WATER-0.5L', 'price' => Money::ofMinor(199, 'EUR'), 'stock' => 50,
-]);
+$small = $product->defaultVariant;
+$small->update(['sku' => 'WATER-0.5L', 'price' => Money::ofMinor(199, 'EUR'), 'stock' => 50]);
+
 $large = $product->variants()->create([
-    'sku' => 'WATER-1L', 'price' => Money::ofMinor(299, 'EUR'), 'stock' => 30,
+    'sku' => 'WATER-1L', 'price' => Money::ofMinor(299, 'EUR'), 'stock' => 30, 'position' => 1,
 ]);
+
+$product->price;                // 1.99 EUR — the default (lowest-position) variant
 
 // Re-pricing in another currency: set `currency` BEFORE `price` — the cast refuses to
 // silently re-denominate a column that already holds another code (CurrencyMismatch).
 $small->update(['currency' => 'USD', 'price' => Money::ofMinor(219, 'USD')]);
 
-$product->defaultVariant;       // lowest-position variant
+$product->defaultVariant;       // lowest-position variant (WATER-0.5L)
 $small->inStock(10);            // bool — respects track_stock and reserved quantity
 $small->availableStock();       // stock - reserved
 ```
@@ -472,7 +508,10 @@ $product->variantFor([$small->id]); // ?ProductVariant
 
 Stock is an auditable ledger: every change is a `StockAdjustment` row, and the variant caches
 `stock` (on hand) and `reserved` (held for pending orders). Every write goes through
-`AdjustStockAction`, which row-locks the variant inside a transaction to avoid oversell.
+`AdjustStockAction`, which row-locks the variant inside a transaction and decides a sale or a
+reservation against that locked row — never a stale copy — so two checkouts can never both take
+the last unit. The variant you pass in gets the new `stock`/`reserved` as clean attributes (a
+later `save()` of it never rewrites stock another request has moved).
 `Shops::inventory($variant)` is the way in:
 
 ```php
@@ -495,14 +534,19 @@ The sign must match the reason — `Received`, `Returned` and `Reserved` add (po
 `Sold` and `Released` remove (negative), `Manual` goes either way — and a zero delta is
 refused; both throw `InvalidQuantityException` before anything is written.
 
-Selling below available stock on a `track_stock` variant throws `InsufficientStockException`;
-variants with `track_stock = false` (digital/unlimited goods) never throw. Every adjustment
-fires `StockAdjusted`, and crossing `shops.inventory.low_stock_threshold` fires `StockRanLow`.
+Selling or reserving more than the available stock of a `track_stock` variant throws
+`InsufficientStockException`; variants with `track_stock = false` (digital/unlimited goods)
+never throw. Every adjustment fires `StockAdjusted`; `StockRanLow` fires once when an
+adjustment takes available stock from above `shops.inventory.low_stock_threshold` to at or
+below it (not again while it stays low). Both fire after the surrounding transaction commits —
+a rolled-back checkout fires nothing.
 
 Orders manage reservations automatically: checkout holds each line's quantity when
-an order is placed, canceling an order **releases** the hold, and fulfilling an order
-**converts** the reservation into a sale (decrementing on-hand stock). An oversell during
-reservation rolls back the whole order and holds nothing.
+an order is placed, canceling an order — or refunding one that was paid but never fulfilled —
+**releases** the hold, and fulfilling an order **converts** the reservation into a sale
+(decrementing on-hand stock). Refunding a fulfilled order leaves stock alone; book the return
+with `Shops::inventory($variant)->returned($qty, $order)`. An oversell during reservation rolls
+back the whole order and holds nothing.
 
 ### Money
 
@@ -564,10 +608,19 @@ the maximum — throws `RoundlyConsulting\Shops\Exceptions\InvalidQuantityExcept
 anything is written. `CartItem` and order `Item` guard their `quantity` on every write too
 (integer strings such as request input are accepted), and a `PriceLine` needs at least one item.
 
-`Shops::cart($cart)->checkout()` turns a cart into an order in one transaction — snapshotting
-each line, reserving stock, linking a coupon by code, storing the billing/shipping address,
-generating the number, firing `OrderPlaced`, and clearing the cart. An oversell rolls everything
-back and leaves the cart untouched:
+`Shops::cart($cart)->checkout()` turns a cart into an order in one transaction — copying each
+line at the name, sku, price and tax class **the cart snapshotted** (what the customer saw, even
+if the catalog was repriced since), reserving stock, linking a coupon by code, quoting and
+snapshotting shipping, storing the billing/shipping address, generating the number, firing
+`OrderPlaced`, and clearing the cart. An oversell rolls everything back and leaves the cart
+untouched.
+
+The cart row stays locked for the whole checkout, so a double-submitted "Place order" places
+**one** order: the second request waits, finds the cart emptied and is refused with
+`Orders\Exceptions\CheckoutRefusedException` (catch it and show the order the first request
+placed). The same exception — thrown before anything is written — refuses an empty cart and a
+cart with a line whose variant was deleted or soft-deleted since it was added
+(`$e->cartItem` names the line), instead of silently dropping it:
 
 ```php
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
@@ -583,14 +636,22 @@ $order = Shops::cart($cart)->checkout(); // no addresses, the cart's own coupon_
 
 Billing and shipping addresses are stored as JSON and cast to an immutable `Address` DTO.
 
+**Shipping.** With a `shipping` address, checkout asks the bound `ShippingMethod`
+(`shops.shipping.method`) to quote it — after the lines are added, so the method can price them
+— and snapshots the result onto the order (`shipping_cost`, in the order currency). Pass the
+option the customer chose instead with `new PlaceOrderData(shipping: $address, shippingCost:
+Money::ofMinor(490, 'EUR'))`. The order's final price and the charge include it, and a
+free-shipping coupon takes it off. No address and no chosen cost: no shipping charge. A cart has
+no destination, so `Shops::cart($cart)->price()` never includes shipping.
+
 ### Orders and pricing
 
 An order has many `items`, an optional `coupon`, an automatically generated `number`, and its
 own **`currency`** — snapshotted when it is created (from the cart at place-order, else its
 shop's, else `SHOPS_DEFAULT_CURRENCY`), so changing the configured default never
 re-denominates historical orders. Its `price` accessor returns a `Price` DTO that computes discount, shipping, tax, and the final
-total from the order's items and the discount **snapshotted when the order was placed**
-(`discount`, `free_shipping`, `coupon_code`) — a coupon that later expires, is revoked or runs
+total from the order's items, its snapshotted shipping (`shipping_cost`) and the discount
+**snapshotted when the order was placed** (`discount`, `free_shipping`, `coupon_code`) — a coupon that later expires, is revoked or runs
 out of uses never re-prices a placed order. The same holds for tax: checkout
 snapshots the rate each line's tax class resolves to (`order_items.tax_rate` in basis points +
 `tax_label`) and the order keeps the `price_type` it was created under, so editing a shop's tax
@@ -619,15 +680,17 @@ $price->getPriceAfterDiscount(); // after the placed discount (if any)
 $price->getNetPrice();           // tax-exclusive value of the goods
 $price->getTaxPrice();           // tax across the goods (after discount)
 $price->getDiscountValue();      // amount saved by the placed discount
+$price->shippingCost();          // the shipping charged: shipping_cost, or zero with free shipping
 $price->getFinalPrice();         // amount the customer pays (goods + shipping, tax-correct)
 $price->taxSummary();            // money TaxSummary: net / tax / gross per rate (invoice VAT table)
 ```
 
 `$order->price` is computed once per model instance and cached, together with its loaded
 `items`: after changing an order in memory (adding items, applying a discount) call
-`$order->refresh()` before reading the price again — and before charging it, since
-`Shops::order($order)->charge()` and `StoreCreditTender` charge the price they read. `checkout()`
-already hands back a refreshed order.
+`$order->refresh()` before reading the price again — and before handing it to
+`StoreCreditTender`, which debits the price it reads. `Shops::order($order)->charge()` re-reads
+the order as stored, under its row lock, before charging. `checkout()` already hands back a
+refreshed order.
 
 Pricing is **quantity-aware** (a 2× line is billed twice) and **tax-correct** for both
 tax-inclusive and tax-exclusive catalogs. Set `shops.pricing.price_type` to `gross`
@@ -672,7 +735,7 @@ Shops::order($order)->refund();
 $order->markInProgress();   // New → InProgress
 $order->markPaid();         // InProgress → Paid, stamps paid_at, fires OrderPaid
 $order->markFulfilled();    // Paid → Fulfilled, fires OrderFulfilled
-$order->cancel();           // → Canceled, fires OrderCanceled
+$order->cancel();           // → Canceled, fires OrderCanceled; returns applied store credit
 $order->refund();           // Paid|Fulfilled → Refunded, fires OrderRefunded
 
 // Or transition explicitly:
@@ -687,9 +750,16 @@ $order->status->isTerminal();                            // bool
 
 An illegal transition (e.g. refunding a `New` order) throws
 `RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException` and changes
-nothing. Every transition fires `OrderStatusChanged` (carrying `from`/`to`) plus a
+nothing. A transition that fails part-way (a fulfilment whose stock cannot be sold) changes
+nothing either — not the row and not the order instance you hold, so retrying it on the same
+instance works. Every transition fires `OrderStatusChanged` (carrying `from`/`to`) plus a
 status-specific event (`OrderPaid`, `OrderFulfilled`, `OrderCanceled`, `OrderRefunded`)
-your application can listen to.
+your application can listen to. Order events (and `OrderPlaced`) fire **after the surrounding
+transaction commits**, so a rolled-back transition or checkout fires nothing.
+
+What each move does to stock and store credit: canceling releases the reservation and returns
+any store credit applied to the order; refunding a `Paid` (not yet fulfilled) order releases the
+reservation; fulfilling sells it; refunding a `Fulfilled` order leaves stock alone.
 
 ### Order numbers
 
@@ -719,7 +789,7 @@ final class UuidNumberGenerator implements NumberGenerator
 
 Products, variants, and categories carry images via `media-library-for-laravel`. Catalog media
 is **public** by default (CDN/SEO friendly) and generates responsive variants from the width
-ladder in `shops.media`.
+ladder in `shops.media`, each named `responsive-<width>` (`responsive-320`, `responsive-640`, …).
 
 ```php
 use Illuminate\Http\UploadedFile;
@@ -727,7 +797,8 @@ use Illuminate\Http\UploadedFile;
 $product->addMedia($file)->toMediaBucket($product->featuredBucket()); // single featured image
 $product->addMedia($file)->toMediaBucket($product->galleryBucket());  // multi-image gallery
 
-$product->featuredImageUrl('detail'); // a named responsive variant
+$product->featuredImageUrl();                   // the original
+$product->featuredImageUrl('responsive-640');   // a responsive variant from the width ladder
 $product->galleryUrls();              // list<string>
 $product->seoImageUrl();              // featured, falling back to the first gallery image
 
@@ -738,8 +809,11 @@ $category->addMedia($file)->toMediaBucket($category->bannerBucket());
 $category->bannerUrl();
 ```
 
-Bucket names, disk, visibility, responsive widths, and max file size are configured under
-`shops.media`.
+Every reader takes an optional variant name and serves the original image when that variant has
+not been generated (an image narrower than the width, or a queued conversion that has not run
+yet), so a page never fails on a missing variant. Bucket names, disk, visibility, responsive
+widths, and the max file size (bytes) are configured under `shops.media` and apply to every
+catalog bucket — product, variant and category alike.
 
 ### Reviews
 
@@ -822,7 +896,22 @@ resolver via `shops.discounts`.
 ### Pay with store credit
 
 With `credits-for-laravel`, buyers can pay all or part of an order from a store-credit bucket
-**denominated in the order's currency**. Map the bucket in `config/credits.php`:
+**denominated in the order's currency**. The buyer model must **implement
+`RoundlyConsulting\Credits\Interfaces\Creditable`** and use credits' `HasCredits` trait — the
+trait alone is not enough: an order whose customer is not `Creditable` is charged in full through
+the gateway, with no credit applied.
+
+```php
+use RoundlyConsulting\Credits\Interfaces\Creditable;
+use RoundlyConsulting\Credits\Traits\HasCredits;
+
+class User extends Authenticatable implements Creditable
+{
+    use HasCredits;
+}
+```
+
+Map the bucket in `config/credits.php`:
 
 ```php
 'currencies' => ['store_credit' => 'EUR'], // your shop currency; one bucket per currency
@@ -831,7 +920,10 @@ With `credits-for-laravel`, buyers can pay all or part of an order from a store-
 Enable `shops.payment.allow_store_credit` (env `SHOPS_ALLOW_STORE_CREDIT`);
 `Shops::order($order)->charge()` then debits available credit before charging the gateway for the remainder
 (`$order->gatewayAmount()`) — an order credit covers in full is marked paid without a gateway
-charge. The bucket is
+charge. A **declined** charge keeps none of the credit it applied (the whole charge rolls back),
+and **canceling** an order returns any credit applied to it — also credit you applied yourself
+with `StoreCreditTender::apply()` — so a buyer never loses credit to an order that was never paid.
+The bucket is
 `shops.payment.store_credit_bucket`, and refunds can be returned as store credit via
 `shops.payment.refund_to_store_credit`.
 
@@ -842,6 +934,8 @@ $remainder = app(StoreCreditTender::class)->apply($order, $customer); // Money s
 $remainder = app(StoreCreditTender::class)->apply($order, $customer, Money::ofMinor(500, 'EUR')); // cap the debit
 
 $order->store_credit_applied; // ?Money, in the order currency
+
+app(StoreCreditTender::class)->restore($order); // ?Money — hand it back (cancel() does this)
 ```
 
 An undenominated bucket throws `StoreCreditBucketNotDenominated` and a bucket in another
@@ -851,7 +945,21 @@ skips such a bucket with a `Log::warning()` instead — the refund has already h
 ### Customer address book
 
 With `addresses-for-laravel`, build an order's billing/shipping snapshot from a customer's saved
-addresses. Add `HasAddresses` to your customer model, then:
+addresses. Your customer model must **implement `RoundlyConsulting\Addresses\Contracts\Addressable`**
+and use the `HasAddresses` trait (`PlaceOrderData::fromAddressBook()` and
+`Shops::addresses()->defaults()` type-hint the interface — the trait alone is a `TypeError`):
+
+```php
+use RoundlyConsulting\Addresses\Contracts\Addressable;
+use RoundlyConsulting\Addresses\Traits\HasAddresses;
+
+class User extends Authenticatable implements Addressable
+{
+    use HasAddresses;
+}
+```
+
+Then:
 
 ```php
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
@@ -903,8 +1011,17 @@ $result = Shops::order($order)->charge();                        // PaymentResul
 $quote  = Shops::order($order)->quoteShipping($destinationAddress); // Money
 ```
 
-A failed charge leaves the order's status unchanged. A zero balance (store credit covered the
-order, or it is free) skips the gateway and succeeds with a zero amount.
+`charge()` only charges a `New` or `InProgress` order, and decides that under the order's row
+lock **before** any store credit or gateway call: charging a `Paid`, `Fulfilled`, `Canceled` or
+`Refunded` order — a double-clicked "Pay", or a second request holding a stale copy — throws
+`IllegalStatusTransitionException` with nothing charged. The whole charge (credit, gateway call,
+move to `Paid`) runs in one transaction holding that lock, so a concurrent second charge waits
+and is then refused. Keep your gateway's `charge()` to the payment call itself; `OrderPaid`
+listeners run after the commit.
+
+A failed (declined) charge leaves the order's status unchanged and keeps no store credit. A zero
+balance (store credit covered the order, or it is free) skips the gateway and succeeds with a
+zero amount. The amount charged includes the order's snapshotted shipping.
 
 Refunds are **host-driven**: the package never calls the gateway's `refund()`. Refund through
 your gateway (at most `$order->gatewayAmount()`), then transition the order:

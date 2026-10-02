@@ -36,13 +36,20 @@ Initial public release.
 - Product variants with their own SKU, price, tax class and stock, composed from options such
   as size and colour.
 - A race-safe inventory ledger (`AdjustStockAction`) with stock reservations for pending
-  orders, plus `StockAdjusted` and `StockRanLow` events.
+  orders — sales and reservations are decided under the variant's row lock — plus
+  `StockAdjusted` and `StockRanLow` (fired once, on crossing the threshold) events.
 - A persistent cart for users or guests, and `checkout()` (`PlaceOrderAction`) to turn it into
-  an order in one transaction.
+  an order in one transaction under the cart's row lock, at the prices the cart snapshotted and
+  with the shipping quoted for the shipping address (`orders.shipping_cost`). A double-submitted
+  checkout, an empty cart or a line whose variant was removed is refused with
+  `CheckoutRefusedException`.
 - Exact net or gross tax pricing on arbitrary-precision money (`money-for-laravel`); orders keep
   their own currency and snapshot their tax rates and discounts.
 - A guarded order state machine (`New`, `InProgress`, `Paid`, `Fulfilled`, `Canceled`,
-  `Refunded`) with status events and pluggable order numbers (`NumberGenerator`).
+  `Refunded`) with status events (dispatched after commit) and pluggable order numbers
+  (`NumberGenerator`). `charge()` only charges a `New` or `InProgress` order, decided under the
+  order's row lock before any store credit or gateway call; a declined charge keeps no store
+  credit, and canceling an order returns the credit applied to it.
 - Coupons via `coupons-for-laravel` and paying with store credit via `credits-for-laravel`.
 - Product and category images via `media-library-for-laravel`, product reviews with
   verified-purchase flags via `reviews-for-laravel`, and filterable spec-sheet attributes via

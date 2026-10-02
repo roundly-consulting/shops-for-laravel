@@ -52,9 +52,11 @@ return [
     | or tax-exclusive ("net"). The default is "gross", matching most EU stores;
     | net is derived by extracting the tax from the stored price.
     |
-    | "default_currency" is the single currency every cart and order uses. The
-    | Money value object supports any ISO 4217 code, but the package operates on
-    | one configured currency at a time.
+    | "default_currency" is the ISO 4217 fallback currency: used by a shop
+    | without its own "currency", by an order created without a shop, and for a
+    | shop-less product's default variant. It is not the only currency: every
+    | cart carries its own, and every order snapshots its currency when it is
+    | created, so changing this never re-denominates a cart or a placed order.
     |
     */
 
@@ -116,10 +118,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | Product, variant, and category imagery is stored via
-    | roundly-consulting/media-library-for-laravel. Catalog images are public by
-    | default (served over a CDN for SEO) with a responsive width ladder used to
-    | generate srcset variants. "disk" defaults to the media package's configured
-    | disk when null; "max_file_size" is an optional per-image byte cap.
+    | roundly-consulting/media-library-for-laravel. Every catalog bucket (product
+    | featured + gallery, variant gallery, category banner) takes these settings.
+    | Catalog images are public by default (served over a CDN for SEO) with a
+    | responsive width ladder used to generate srcset variants, named
+    | "responsive-<width>". "disk" defaults to the media package's configured
+    | disk when null; "max_file_size" is an optional per-image cap in bytes.
     |
     */
 
@@ -235,9 +239,11 @@ return [
         | When "allow_store_credit" is on, ChargeOrderAction applies the buyer's
         | available store credit (from roundly-consulting/credits-for-laravel)
         | before charging the gateway, allowing full or partial payment with
-        | credit. "store_credit_bucket" is the credits bucket used.
-        | "refund_to_store_credit" grants a refunded order's total back to the
-        | buyer as store credit instead of a gateway refund.
+        | credit; a declined charge keeps none of it, and canceling an order
+        | returns the credit applied to it. The buyer model must implement
+        | Creditable (credits' HasCredits trait). "store_credit_bucket" is the
+        | credits bucket used. "refund_to_store_credit" grants a refunded order's
+        | total back to the buyer as store credit instead of a gateway refund.
         |
         */
 
@@ -252,8 +258,11 @@ return [
     |--------------------------------------------------------------------------
     |
     | "method" is the class quoting shipping cost. It must implement
-    | RoundlyConsulting\Shops\Contracts\ShippingMethod. The default quotes free
-    | shipping; bind your own carrier implementation.
+    | RoundlyConsulting\Shops\Contracts\ShippingMethod. Checkout quotes the
+    | order's shipping address through it (unless PlaceOrderData carries a
+    | chosen shippingCost) and snapshots the result onto the order, where it is
+    | part of the final price and the charge. The default quotes free shipping;
+    | bind your own carrier implementation.
     |
     */
 
