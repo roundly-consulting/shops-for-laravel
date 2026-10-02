@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Shops\Orders;
 use RoundlyConsulting\Addresses\Address as AddressModel;
 use RoundlyConsulting\Addresses\Contracts\Addressable;
 use RoundlyConsulting\Addresses\Enums\AddressType;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Address;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\OrderAddresses;
 
@@ -29,7 +30,7 @@ final class AddressBook
      */
     public function defaults(Addressable $customer, ?bool $billingSameAsShipping = null): OrderAddresses
     {
-        $billingSameAsShipping ??= (bool) config('shops.addresses.billing_same_as_shipping', true);
+        $billingSameAsShipping ??= Config::boolean('shops.addresses.billing_same_as_shipping', true);
 
         $shipping = $this->map($customer->getPrimaryAddressOfType(AddressType::Shipping));
         $billing = $this->map($customer->getPrimaryAddressOfType(AddressType::Billing));

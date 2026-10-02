@@ -11,6 +11,7 @@ use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
 use RoundlyConsulting\Shops\Contracts\PaymentGateway;
 use RoundlyConsulting\Shops\Contracts\ShippingMethod;
@@ -65,7 +66,7 @@ final class ShopsServiceProvider extends PackageServiceProvider
                     NullVerifiedPurchaseResolver::class,
                 ),
                 'Fallback locale' => (string) config('shops.locales.fallback', 'en'),
-                'Slug history' => (bool) config('shops.slugs.history', false) ? 'ON' : 'OFF',
+                'Slug history' => Config::boolean('shops.slugs.history') ? 'ON' : 'OFF',
             ]);
     }
 
@@ -159,11 +160,11 @@ final class ShopsServiceProvider extends PackageServiceProvider
      */
     private static function storeCredit(): string
     {
-        if (config('shops.payment.allow_store_credit') !== true) {
+        if (! Config::boolean('shops.payment.allow_store_credit')) {
             return 'OFF';
         }
 
-        $refund = config('shops.payment.refund_to_store_credit') === true ? 'refunds ON' : 'refunds OFF';
+        $refund = Config::boolean('shops.payment.refund_to_store_credit') ? 'refunds ON' : 'refunds OFF';
 
         return "ON (bucket SET, {$refund})";
     }
@@ -176,7 +177,7 @@ final class ShopsServiceProvider extends PackageServiceProvider
     {
         $disk = config('shops.media.disk');
         $widths = config('shops.media.responsive_widths');
-        $visibility = config('shops.media.public') === false ? 'private' : 'public';
+        $visibility = Config::boolean('shops.media.public', true) ? 'public' : 'private';
 
         return sprintf(
             '%s, %s, %d width(s)',

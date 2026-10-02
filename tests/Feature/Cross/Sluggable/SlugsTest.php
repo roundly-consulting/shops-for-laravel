@@ -277,3 +277,17 @@ it('ships exactly the slug indexes the model definitions ask for', function (str
     'products' => [Product::class, 'products'],
     'categories' => [Category::class, 'product_categories'],
 ]);
+
+it('reads an env-string history switch as a boolean', function (string $value, int $status): void {
+    config()->set('shops.slugs.history', $value);
+
+    $product = slugProduct(Shop::factory()->create(), 'Chair');
+    $product->setTranslation('slug', 'en', 'armchair')->save();
+
+    $this->get('/products/chair')->assertStatus($status);
+})->with([
+    'on' => ['on', 301],
+    '1' => ['1', 301],
+    'off' => ['off', 404],
+    '0' => ['0', 404],
+]);

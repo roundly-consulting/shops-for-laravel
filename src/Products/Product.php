@@ -13,6 +13,7 @@ use RoundlyConsulting\Attributes\Contracts\HasAttributes as HasAttributesContrac
 use RoundlyConsulting\Attributes\Traits\HasAttributes;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
 use RoundlyConsulting\Money\Money;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Reviews\Concerns\HasReviews;
 use RoundlyConsulting\Reviews\Support\PendingReview;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
@@ -101,7 +102,7 @@ final class Product extends Model implements HasAttributesContract, HasMedia, Sl
                 ->localized()
                 ->uniqueWithin('shop_id')
                 ->fallbackLocale(fn (): string => (string) config('shops.locales.fallback', 'en'))
-                ->keepHistory((bool) config('shops.slugs.history', false))
+                ->keepHistory(Config::boolean('shops.slugs.history'))
                 ->routeKey(),
         );
     }

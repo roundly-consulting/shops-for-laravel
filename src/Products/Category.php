@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Concerns\HasPublishing;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
@@ -70,7 +71,7 @@ final class Category extends Model implements HasMedia, Sluggable, Translatable
                 ->localized()
                 ->uniqueWithin('shop_id')
                 ->fallbackLocale(fn (): string => (string) config('shops.locales.fallback', 'en'))
-                ->keepHistory((bool) config('shops.slugs.history', false))
+                ->keepHistory(Config::boolean('shops.slugs.history'))
                 ->routeKey(),
         );
     }

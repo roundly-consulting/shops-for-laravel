@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Money\Currency;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Shops\Concerns\BelongsToShop;
 use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
@@ -81,7 +82,7 @@ class Shop extends Model implements Sluggable, Translatable
                 ->localized()
                 ->unique()
                 ->fallbackLocale(fn (): string => (string) config('shops.locales.fallback', 'en'))
-                ->keepHistory((bool) config('shops.slugs.history', false))
+                ->keepHistory(Config::boolean('shops.slugs.history'))
                 ->routeKey(),
         );
     }

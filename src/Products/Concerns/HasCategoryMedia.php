@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\MediaLibrary\Buckets\MediaBucket;
 use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * A single public `banner` image for the bundled Category model, built on
@@ -60,7 +61,7 @@ trait HasCategoryMedia
             $bucket->useDisk($disk);
         }
 
-        if ((bool) config('shops.media.public', true)) {
+        if (Config::boolean('shops.media.public', true)) {
             $bucket->public();
         } else {
             $bucket->private();

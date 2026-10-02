@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use RoundlyConsulting\MediaLibrary\Buckets\MediaBucket;
 use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * First-class catalog media for the bundled Product model, built on
@@ -109,7 +110,7 @@ trait HasProductMedia
             $bucket->useDisk($disk);
         }
 
-        if ((bool) config('shops.media.public', true)) {
+        if (Config::boolean('shops.media.public', true)) {
             $bucket->public();
         } else {
             $bucket->private();

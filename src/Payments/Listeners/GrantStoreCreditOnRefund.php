@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Shops\Payments\Listeners;
 
 use Illuminate\Support\Facades\Log;
 use RoundlyConsulting\Credits\Interfaces\Creditable;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Shops\Orders\Events\OrderRefunded;
 
 /**
@@ -20,7 +21,7 @@ final class GrantStoreCreditOnRefund
 {
     public function handle(OrderRefunded $event): void
     {
-        if (! (bool) config('shops.payment.refund_to_store_credit', false)) {
+        if (! Config::boolean('shops.payment.refund_to_store_credit')) {
             return;
         }
 

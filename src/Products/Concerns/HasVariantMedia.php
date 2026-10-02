@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use RoundlyConsulting\MediaLibrary\Buckets\MediaBucket;
 use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * Per-variant catalog media built on media-library, so a colour/size variant can
@@ -72,7 +73,7 @@ trait HasVariantMedia
             $bucket->useDisk($disk);
         }
 
-        if ((bool) config('shops.media.public', true)) {
+        if (Config::boolean('shops.media.public', true)) {
             $bucket->public();
         } else {
             $bucket->private();
