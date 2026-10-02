@@ -17,8 +17,9 @@ use RoundlyConsulting\Shops\Orders\Order;
 
 /**
  * Converts a cart into a placed order in a single transaction: the order takes the
- * cart's currency (a snapshot — config changes never re-denominate it), each cart line is
- * snapshotted into an order item, stock is reserved, the buyer (cart owner or an
+ * cart's currency (a snapshot — config changes never re-denominate it), each cart line becomes
+ * an order item at the name, sku, price and tax class the cart snapshotted (what the customer
+ * saw, never a later catalog price), stock is reserved, the buyer (cart owner or an
  * explicit customer) is linked, an optional coupon is redeemed via
  * coupons-for-laravel and its discount snapshotted onto the order, the
  * billing/shipping addresses are stored, the order number is generated, the cart
@@ -65,7 +66,8 @@ final class PlaceOrderAction
                     continue;
                 }
 
-                $this->addItem->execute($order, $variant, $cartItem->quantity);
+                // The line's own snapshot — the price the customer saw — not today's catalog.
+                $this->addItem->execute($order, $variant, $cartItem->quantity, $cartItem);
             }
 
             $this->reserveStock->execute($order);
