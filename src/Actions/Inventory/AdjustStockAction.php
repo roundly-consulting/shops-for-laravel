@@ -18,9 +18,10 @@ use RoundlyConsulting\Shops\Products\ProductVariant;
  * writing an auditable ledger row. The sign must match the reason
  * ({@see StockReason::direction()}: received/returned/reserved add, sold/released remove,
  * manual either way) and a zero delta is refused — both throw
- * {@see InvalidQuantityException} before anything is written. A negative delta that would breach available
- * stock on a tracked variant throws {@see InsufficientStockException}; untracked
- * variants never throw and only record the ledger row.
+ * {@see InvalidQuantityException} before anything is written. A sale, or a reservation, that would
+ * take a tracked variant's available stock below zero throws {@see InsufficientStockException} —
+ * decided against the row-locked variant, never the caller's copy; untracked variants never
+ * throw and only record the ledger row.
  */
 final class AdjustStockAction
 {
@@ -70,6 +71,12 @@ final class AdjustStockAction
     private function applyDelta(ProductVariant $variant, int $delta, StockReason $reason): void
     {
         if ($reason->affectsReserved()) {
+            // A hold is taken against what is available on the LOCKED row — never the caller's
+            // copy — so two checkouts can never both reserve the last unit.
+            if ($variant->track_stock && $delta > 0 && $variant->availableStock() < $delta) {
+                throw InsufficientStockException::for($variant, $delta);
+            }
+
             $variant->reserved = max(0, $variant->reserved + $delta);
             $variant->save();
 

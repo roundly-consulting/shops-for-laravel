@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use RoundlyConsulting\Shops\Actions\Inventory\AdjustStockAction;
+use RoundlyConsulting\Shops\Cart\Cart;
+use RoundlyConsulting\Shops\Facades\Shops;
 use RoundlyConsulting\Shops\Inventory\Enums\StockReason;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Inventory\StockAdjustment;
+use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 
 /**
@@ -167,4 +171,79 @@ it('never lets a release drive the reserved count below zero', function (): void
 
     expect($variant->refresh()->reserved)->toBe(0)
         ->and($variant->availableStock())->toBe(5);
+});
+
+it('never reserves beyond available stock, even through the action directly', function (): void {
+    $variant = trackedVariant(1);
+
+    expect(fn () => app(AdjustStockAction::class)->execute($variant, 5, StockReason::Reserved))
+        ->toThrow(InsufficientStockException::class);
+
+    expect($variant->refresh()->reserved)->toBe(0)
+        ->and(StockAdjustment::query()->count())->toBe(0);
+});
+
+it('checks a reservation against the locked row, never a stale copy', function (): void {
+    $variant = trackedVariant(1);
+
+    $first = ProductVariant::query()->findOrFail($variant->getKey());
+    $second = ProductVariant::query()->findOrFail($variant->getKey());
+
+    app(AdjustStockAction::class)->execute($first, 1, StockReason::Reserved);
+
+    // The second buyer still sees one unit available in memory.
+    expect($second->availableStock())->toBe(1);
+
+    expect(fn () => app(AdjustStockAction::class)->execute($second, 1, StockReason::Reserved))
+        ->toThrow(InsufficientStockException::class);
+
+    expect($variant->refresh()->reserved)->toBe(1);
+});
+
+it('lets an untracked variant reserve past its stock', function (): void {
+    $variant = ProductVariant::factory()->create(['track_stock' => false, 'stock' => 0, 'reserved' => 0]);
+
+    app(AdjustStockAction::class)->execute($variant, 3, StockReason::Reserved);
+
+    expect($variant->refresh()->reserved)->toBe(3);
+});
+
+/**
+ * Two checkouts race for the last unit: B runs to completion between A reading its variants
+ * and A reserving them. A must lose — the reservation is decided under the variant's row lock.
+ */
+it('never oversells the last unit to two interleaved checkouts', function (): void {
+    $variant = ProductVariant::factory()->withEurPrice('1000')->create(['track_stock' => true, 'stock' => 1, 'reserved' => 0]);
+
+    $cartA = Cart::create(['currency' => 'EUR']);
+    $cartA->add($variant);
+    $cartB = Cart::create(['currency' => 'EUR']);
+    $cartB->add($variant);
+
+    $state = ['seenItems' => false, 'interleaved' => false, 'orderB' => null, 'reservedAfterB' => null];
+
+    DB::listen(function (QueryExecuted $query) use (&$state, $cartB, $variant): void {
+        if ($state['interleaved']) {
+            return;
+        }
+
+        if (str_contains($query->sql, 'from "order_items"')) {
+            $state['seenItems'] = true;
+
+            return;
+        }
+
+        // A has just read its order's variants (one unit available). Run B now.
+        if ($state['seenItems'] && str_contains($query->sql, 'from "product_variants"')) {
+            $state['interleaved'] = true;
+            $state['orderB'] = Shops::cart($cartB)->checkout();
+            $state['reservedAfterB'] = $variant->fresh()?->reserved;
+        }
+    });
+
+    expect(fn () => Shops::cart($cartA)->checkout())->toThrow(InsufficientStockException::class);
+
+    expect($state['interleaved'])->toBeTrue()
+        ->and($state['orderB'])->toBeInstanceOf(Order::class)
+        ->and($state['reservedAfterB'])->toBe(1);
 });
