@@ -78,3 +78,53 @@ it('is constructable from the container and is the bound default resolver', func
     expect(app(DatabaseTaxResolver::class))->toBeInstanceOf(DatabaseTaxResolver::class)
         ->and(resolve(TaxResolver::class))->toBeInstanceOf(DatabaseTaxResolver::class);
 });
+
+it('matches the destination country case-insensitively', function (string $asked): void {
+    $shop = Shop::factory()->create();
+    TaxRate::factory()->for($shop, 'shop')->create([
+        'tax_class' => 'standard', 'country' => 'DE', 'rate' => 1900,
+    ]);
+    TaxRate::factory()->for($shop, 'shop')->create([
+        'tax_class' => 'standard', 'country' => 'AT', 'rate' => 2000, 'priority' => 9,
+    ]);
+
+    expect(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard', $asked)->basisPoints)->toBe(1900);
+})->with(['de', 'De', ' DE ']);
+
+it('stores a rate country upper-cased, so a lowercase row still matches', function (): void {
+    $shop = Shop::factory()->create();
+    $rate = TaxRate::factory()->for($shop, 'shop')->create([
+        'tax_class' => 'standard', 'country' => 'de', 'rate' => 1900,
+    ]);
+
+    expect($rate->country)->toBe('DE')
+        ->and(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard', 'DE')->basisPoints)->toBe(1900);
+});
+
+it('honours a country-specific rate flagged as the class default', function (): void {
+    $shop = Shop::factory()->create();
+    TaxRate::factory()->for($shop, 'shop')->default()->create([
+        'tax_class' => 'standard', 'country' => 'DE', 'rate' => 1900,
+    ]);
+    TaxRate::factory()->for($shop, 'shop')->create([
+        'tax_class' => 'standard', 'country' => 'AT', 'rate' => 2000, 'priority' => 9,
+    ]);
+
+    // No destination (a cart), or one the shop has no rate for: the flagged default wins over
+    // the higher-priority AT rate.
+    expect(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard')->basisPoints)->toBe(1900)
+        ->and(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard', 'IT')->basisPoints)->toBe(1900)
+        ->and(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard', 'AT')->basisPoints)->toBe(2000);
+});
+
+it('prefers a country-agnostic default over a country-specific one', function (): void {
+    $shop = Shop::factory()->create();
+    TaxRate::factory()->for($shop, 'shop')->default()->create([
+        'tax_class' => 'standard', 'country' => 'DE', 'rate' => 1900, 'priority' => 9,
+    ]);
+    TaxRate::factory()->for($shop, 'shop')->default()->create([
+        'tax_class' => 'standard', 'country' => null, 'rate' => 2100,
+    ]);
+
+    expect(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard', 'FR')->basisPoints)->toBe(2100);
+});

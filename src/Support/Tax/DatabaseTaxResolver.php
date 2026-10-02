@@ -13,8 +13,10 @@ use RoundlyConsulting\Shops\Shops\TaxRate;
  * The default tax resolver. Resolves a (shop, class, country) lookup against the
  * shop's database tax rates with a defined fallback chain:
  *
- *   1. exact match: shop + class + the requested country
- *   2. the shop's class default (`is_default`, country-agnostic)
+ *   1. exact match: shop + class + the requested country (case-insensitive — an address
+ *      country is user input)
+ *   2. the shop's class default: the `is_default` rate, a country-agnostic one first, else a
+ *      country-specific one (a German shop's DE rate as its default for everywhere else)
  *   3. the highest-priority rate for the class within the shop
  *   4. the config floor (`shops.tax_classes`) via {@see ConfigTaxResolver}
  *   5. a zero rate
@@ -38,6 +40,7 @@ final readonly class DatabaseTaxResolver implements TaxResolver
         }
 
         $rates = $this->ratesFor($shop, $taxClass);
+        $country = self::normalizeCountry($country);
 
         $match = $this->exactCountryMatch($rates, $country)
             ?? $this->classDefault($rates)
@@ -76,7 +79,7 @@ final readonly class DatabaseTaxResolver implements TaxResolver
         }
 
         return $rates->first(
-            fn (TaxRate $rate): bool => $rate->country === $country,
+            fn (TaxRate $rate): bool => self::normalizeCountry($rate->country) === $country,
         );
     }
 
@@ -85,8 +88,21 @@ final readonly class DatabaseTaxResolver implements TaxResolver
      */
     private function classDefault(Collection $rates): ?TaxRate
     {
-        return $rates->first(
-            fn (TaxRate $rate): bool => $rate->is_default && $rate->country === null,
-        );
+        return $rates->first(fn (TaxRate $rate): bool => $rate->is_default && $rate->country === null)
+            ?? $rates->first(fn (TaxRate $rate): bool => $rate->is_default);
+    }
+
+    /**
+     * Upper-cased and trimmed, `null` for none: `de`, ` DE ` and `DE` are one country.
+     */
+    public static function normalizeCountry(?string $country): ?string
+    {
+        if ($country === null) {
+            return null;
+        }
+
+        $country = mb_strtoupper(trim($country));
+
+        return $country === '' ? null : $country;
     }
 }

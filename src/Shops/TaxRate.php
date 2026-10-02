@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops\Shops;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -51,6 +52,19 @@ final class TaxRate extends Model
             'is_default' => 'boolean',
             'priority' => 'integer',
         ];
+    }
+
+    /**
+     * Stored upper-cased (ISO-3166-1 alpha-2), so `de` and `DE` are the same country.
+     *
+     * @return Attribute<string|null, string|null>
+     */
+    protected function country(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (?string $value): ?string => $value,
+            set: static fn (?string $value): ?string => DatabaseTaxResolver::normalizeCountry($value),
+        );
     }
 
     /**
