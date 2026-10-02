@@ -23,8 +23,8 @@ use RoundlyConsulting\Shops\Support\Tax\TaxRateValue;
 trait HasPrice
 {
     /**
-     * The order's price from its items and the discount snapshotted when it was placed
-     * (`discount` + `free_shipping`). The coupon is never re-resolved here: its current
+     * The order's price from its items, the shipping and the discount snapshotted when it was
+     * placed (`shipping_cost`, `discount` + `free_shipping`). The coupon is never re-resolved here: its current
      * redeemability — expired, revoked, used up by this very order — must not re-price a
      * placed order, since the charge, store credit and refund credit-back all read this.
      * Likewise each item's snapshotted tax rate and the order's `price_type` are used as
@@ -59,11 +59,13 @@ trait HasPrice
             $currency = $this->getAttribute('currency');
             $currency = $currency instanceof Currency ? $currency : Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
             $discount = $this->getAttribute('discount');
+            $shipping = $this->getAttribute('shipping_cost');
             $priceType = $this->getAttribute('price_type');
 
             return new Price(
                 lines: $lines,
-                shipping: Money::zero($currency),
+                // The shipping snapshotted at checkout; a free-shipping grant zeroes it.
+                shipping: $shipping instanceof Money ? $shipping : Money::zero($currency),
                 // The snapshotted price type; config only for an order not yet inserted.
                 priceType: $priceType instanceof PriceType
                     ? $priceType

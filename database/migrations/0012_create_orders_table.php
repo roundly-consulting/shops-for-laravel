@@ -39,6 +39,10 @@ return new class extends Migration
             $table->boolean('free_shipping')->default(false);
             $table->string('coupon_code')->nullable();
 
+            // The shipping charge quoted (or chosen) at checkout, snapshotted in the order
+            // currency: part of the final price unless `free_shipping` was granted.
+            $table->money('shipping_cost', currency: 'currency', nullable: true);
+
             $table->jsonb('billing_address')->nullable();
             $table->jsonb('shipping_address')->nullable();
 

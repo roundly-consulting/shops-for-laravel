@@ -45,6 +45,7 @@ use RoundlyConsulting\Shops\Support\Casts\AddressCast;
  * @property Money|null $store_credit_applied
  * @property Money|null $discount
  * @property bool $free_shipping
+ * @property Money|null $shipping_cost
  * @property string|null $coupon_code
  * @property string|null $note
  * @property Address|null $billing_address
@@ -131,6 +132,7 @@ final class Order extends Model
             'store_credit_applied' => AsMoney::currencyColumn('currency'),
             'discount' => AsMoney::currencyColumn('currency'),
             'free_shipping' => 'boolean',
+            'shipping_cost' => AsMoney::currencyColumn('currency'),
         ];
     }
 

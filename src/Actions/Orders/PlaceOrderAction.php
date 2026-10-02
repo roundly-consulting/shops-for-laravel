@@ -7,9 +7,12 @@ namespace RoundlyConsulting\Shops\Actions\Orders;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Coupons\CouponManager;
 use RoundlyConsulting\Coupons\Exceptions\CouponNotRedeemable;
+use RoundlyConsulting\Money\Exceptions\CurrencyMismatch;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Actions\Cart\ClearCartAction;
 use RoundlyConsulting\Shops\Cart\Cart;
 use RoundlyConsulting\Shops\Contracts\DiscountResolver;
+use RoundlyConsulting\Shops\Contracts\ShippingMethod;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PlaceOrderData;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
@@ -24,8 +27,8 @@ use RoundlyConsulting\Shops\Products\ProductVariant;
  * an order item at the name, sku, price and tax class the cart snapshotted (what the customer
  * saw, never a later catalog price), stock is reserved, the buyer (cart owner or an
  * explicit customer) is linked, an optional coupon is redeemed via
- * coupons-for-laravel and its discount snapshotted onto the order, the
- * billing/shipping addresses are stored, the order number is generated, the cart
+ * coupons-for-laravel and its discount snapshotted onto the order, the shipping charge is
+ * quoted (or taken as chosen) and snapshotted, the billing/shipping addresses are stored, the order number is generated, the cart
  * is cleared, and {@see OrderPlaced} is fired (after commit). Any oversell rolls the whole
  * thing back and leaves the cart intact.
  *
@@ -42,12 +45,14 @@ final class PlaceOrderAction
         private readonly ClearCartAction $clearCart,
         private readonly CouponManager $coupons,
         private readonly DiscountResolver $discounts,
+        private readonly ShippingMethod $shipping,
     ) {}
 
     /**
      * @throws CheckoutRefusedException when the cart is empty (also a second, double-submitted
      *                                  checkout) or a line's variant was (soft-)deleted.
      * @throws InsufficientStockException when any line would oversell.
+     * @throws CurrencyMismatch when the shipping cost is in another currency than the cart.
      */
     public function execute(Cart $cart, PlaceOrderData $data = new PlaceOrderData): Order
     {
@@ -100,6 +105,8 @@ final class PlaceOrderAction
 
             $this->redeemCoupon($order, $data->couponCode ?? $locked->coupon_code);
 
+            $this->snapshotShipping($order, $data);
+
             $this->clearCart->execute($cart);
 
             // Refresh first so listeners read the snapshotted discount, not a price
@@ -124,6 +131,36 @@ final class PlaceOrderAction
             ->first();
 
         return $locked instanceof Cart ? $locked : $cart;
+    }
+
+    /**
+     * Snapshot the shipping charge onto the order: the cost the customer chose
+     * (`PlaceOrderData::$shippingCost`), else the bound ShippingMethod's quote for the shipping
+     * address — quoted after the lines are added, so the method can price them. No address and
+     * no chosen cost: no shipping charge.
+     *
+     * @throws CurrencyMismatch when the cost is in another currency than the order.
+     * @throws CheckoutRefusedException when the cost is negative.
+     */
+    private function snapshotShipping(Order $order, PlaceOrderData $data): void
+    {
+        $cost = $data->shippingCost
+            ?? ($data->shipping !== null ? $this->shipping->quote($order, $data->shipping) : null);
+
+        if (! $cost instanceof Money) {
+            return;
+        }
+
+        if (! $cost->currency()->equals($order->currency)) {
+            throw CurrencyMismatch::between($order->currency, $cost->currency());
+        }
+
+        if ($cost->isNegative()) {
+            throw CheckoutRefusedException::negativeShipping($cost);
+        }
+
+        $order->shipping_cost = $cost;
+        $order->save();
     }
 
     /**

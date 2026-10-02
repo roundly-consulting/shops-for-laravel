@@ -6,8 +6,14 @@ namespace RoundlyConsulting\Shops\Orders\DataTransferObjects;
 
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Addresses\Contracts\Addressable;
+use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\ShopsManager;
 
+/**
+ * What checkout needs besides the cart. `$shippingCost` is the shipping the customer chose (in
+ * the cart's currency); leave it null to have the bound ShippingMethod quote the `$shipping`
+ * address. With neither, the order carries no shipping charge.
+ */
 final readonly class PlaceOrderData
 {
     public function __construct(
@@ -16,6 +22,7 @@ final readonly class PlaceOrderData
         public ?string $couponCode = null,
         public ?string $note = null,
         public ?Model $customer = null,
+        public ?Money $shippingCost = null,
     ) {}
 
     /**
@@ -28,6 +35,7 @@ final readonly class PlaceOrderData
         ?string $couponCode = null,
         ?string $note = null,
         ?bool $billingSameAsShipping = null,
+        ?Money $shippingCost = null,
     ): self {
         $defaults = app(ShopsManager::class)->addresses()->defaults($customer, $billingSameAsShipping);
 
@@ -37,6 +45,7 @@ final readonly class PlaceOrderData
             couponCode: $couponCode,
             note: $note,
             customer: $customer,
+            shippingCost: $shippingCost,
         );
     }
 }
