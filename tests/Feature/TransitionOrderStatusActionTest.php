@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
+use RoundlyConsulting\Shops\Actions\Orders\AddOrderItemAction;
+use RoundlyConsulting\Shops\Actions\Orders\ReserveStockAction;
 use RoundlyConsulting\Shops\Actions\Orders\TransitionOrderStatusAction;
+use RoundlyConsulting\Shops\Facades\Shops;
+use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Orders\Enums\Status;
 use RoundlyConsulting\Shops\Orders\Events\OrderCanceled;
 use RoundlyConsulting\Shops\Orders\Events\OrderFulfilled;
@@ -13,6 +17,7 @@ use RoundlyConsulting\Shops\Orders\Events\OrderRefunded;
 use RoundlyConsulting\Shops\Orders\Events\OrderStatusChanged;
 use RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException;
 use RoundlyConsulting\Shops\Orders\Order;
+use RoundlyConsulting\Shops\Products\ProductVariant;
 
 it('transitions an order and stamps the matching timestamp column', function (): void {
     Carbon::setTestNow('2026-06-17 20:00:00');
@@ -118,4 +123,29 @@ it('refuses a transition decided on a stale copy of the order', function (): voi
         ->and($order->refresh()->status)->toBe(Status::Refunded);
 
     Event::assertDispatchedTimes(OrderRefunded::class, 1);
+});
+
+it('leaves the in-memory order untouched when a transition fails, so a retry really persists', function (): void {
+    $variant = ProductVariant::factory()->withEurPrice('1000')->create(['stock' => 2]);
+    $order = Order::factory()->inProgress()->create();
+    app(AddOrderItemAction::class)->execute($order, $variant, 2);
+    app(ReserveStockAction::class)->execute($order);
+    $order->markPaid();
+
+    // Stock drifted (a count found the units gone): fulfilling cannot sell them.
+    ProductVariant::query()->whereKey($variant->getKey())->update(['stock' => 0]);
+
+    expect(fn () => $order->markFulfilled())->toThrow(InsufficientStockException::class);
+
+    expect($order->status)->toBe(Status::Paid)
+        ->and($order->fulfilled_at)->toBeNull()
+        ->and($order->isDirty())->toBeFalse();
+
+    Shops::inventory($variant)->receive(2);
+
+    $order->markFulfilled();
+
+    expect($order->refresh()->status)->toBe(Status::Fulfilled)
+        ->and($order->fulfilled_at)->not->toBeNull()
+        ->and($variant->refresh())->stock->toBe(0)->reserved->toBe(0);
 });

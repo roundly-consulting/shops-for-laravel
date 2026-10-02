@@ -13,13 +13,16 @@ use RoundlyConsulting\Shops\Orders\Events\OrderStatusChanged;
 use RoundlyConsulting\Shops\Orders\Exceptions\IllegalStatusTransitionException;
 use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\StoreCreditTender;
+use Throwable;
 
 /**
  * Moves an order from its current status to a new one, enforcing the allowed
  * transition map, stamping the matching timestamp column, persisting the
  * change, and firing the generic and status-specific events. The current status is
  * read under the order's row lock, so two requests can never both make the same move.
- * Canceling also returns any store credit applied to the order to the buyer.
+ * Canceling also returns any store credit applied to the order to the buyer. A move that fails
+ * (an illegal transition, or a fulfilment that cannot sell its stock) changes nothing — in the
+ * database or on the in-memory order.
  */
 final class TransitionOrderStatusAction
 {
@@ -30,7 +33,32 @@ final class TransitionOrderStatusAction
 
     public function execute(Order $order, Status $to): Order
     {
-        $from = $order->getConnection()->transaction(function () use ($order, $to): Status {
+        $attributes = $order->getAttributes();
+        $original = $order->getRawOriginal();
+        $exists = $order->exists;
+
+        try {
+            $from = $this->apply($order, $to);
+        } catch (Throwable $e) {
+            // The transaction rolled the row back; put the in-memory order back too, so a retry
+            // on this instance writes the status instead of seeing it as already clean.
+            $order->setRawAttributes($original, true);
+            $order->setRawAttributes($attributes);
+            $order->exists = $exists;
+
+            throw $e;
+        }
+
+        OrderStatusChanged::dispatch($order, $from, $to);
+
+        $this->dispatchSpecificEvent($order, $to);
+
+        return $order;
+    }
+
+    private function apply(Order $order, Status $to): Status
+    {
+        return $order->getConnection()->transaction(function () use ($order, $to): Status {
             $from = $this->currentStatus($order);
 
             if (! $from->canTransitionTo($to)) {
@@ -56,12 +84,6 @@ final class TransitionOrderStatusAction
 
             return $from;
         });
-
-        OrderStatusChanged::dispatch($order, $from, $to);
-
-        $this->dispatchSpecificEvent($order, $to);
-
-        return $order;
     }
 
     /**
