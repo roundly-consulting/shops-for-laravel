@@ -21,7 +21,8 @@ use RoundlyConsulting\Shops\Products\ProductVariant;
  * {@see InvalidQuantityException} before anything is written. A sale, or a reservation, that would
  * take a tracked variant's available stock below zero throws {@see InsufficientStockException} —
  * decided against the row-locked variant, never the caller's copy; untracked variants never
- * throw and only record the ledger row.
+ * throw and only record the ledger row. StockRanLow fires when an adjustment takes available
+ * stock across `shops.inventory.low_stock_threshold` (from above it to at or below it).
  */
 final class AdjustStockAction
 {
@@ -38,6 +39,8 @@ final class AdjustStockAction
             /** @var ProductVariant $locked */
             $locked = $variant->newQuery()->lockForUpdate()->findOrFail($variant->getKey());
 
+            $availableBefore = $locked->availableStock();
+
             $this->applyDelta($locked, $delta, $reason);
 
             $adjustment = $this->record($locked, $delta, $reason, $reference, $note);
@@ -46,7 +49,7 @@ final class AdjustStockAction
 
             StockAdjusted::dispatch($variant, $adjustment);
 
-            $this->notifyIfLow($variant);
+            $this->notifyIfLow($variant, $availableBefore);
 
             return $adjustment;
         });
@@ -134,7 +137,11 @@ final class AdjustStockAction
         return $adjustment;
     }
 
-    private function notifyIfLow(ProductVariant $variant): void
+    /**
+     * Fire StockRanLow when this adjustment took available stock from above the threshold to at
+     * or below it — once per crossing, not on every move while the variant is already low.
+     */
+    private function notifyIfLow(ProductVariant $variant, int $availableBefore): void
     {
         if (! $variant->track_stock) {
             return;
@@ -142,7 +149,7 @@ final class AdjustStockAction
 
         $threshold = (int) config('shops.inventory.low_stock_threshold', 0);
 
-        if ($variant->availableStock() <= $threshold) {
+        if ($availableBefore > $threshold && $variant->availableStock() <= $threshold) {
             StockRanLow::dispatch($variant, $threshold);
         }
     }

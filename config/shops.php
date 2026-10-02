@@ -99,9 +99,10 @@ return [
     | Inventory
     |--------------------------------------------------------------------------
     |
-    | "low_stock_threshold" is the available-stock level at or below which a
-    | tracked variant fires the StockRanLow event after an adjustment, so the
-    | host can reorder or hide the product.
+    | "low_stock_threshold" is the available-stock level a tracked variant
+    | fires the StockRanLow event at: once, when an adjustment takes available
+    | stock from above the threshold to at or below it, so the host can reorder
+    | or hide the product.
     |
     */
 

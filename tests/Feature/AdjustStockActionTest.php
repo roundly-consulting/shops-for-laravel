@@ -96,3 +96,33 @@ it('does not fire low-stock for untracked variants', function (): void {
 
     Event::assertNotDispatched(StockRanLow::class);
 });
+
+it('fires the low-stock event only on crossing the threshold, not on every move below it', function (): void {
+    config()->set('shops.inventory.low_stock_threshold', 5);
+    Event::fake([StockRanLow::class]);
+    $variant = ProductVariant::factory()->create(['stock' => 3, 'reserved' => 0]);
+
+    // Already low: moving around below the threshold is not news.
+    app(AdjustStockAction::class)->execute($variant, 1, StockReason::Received);
+    app(AdjustStockAction::class)->execute($variant, 1, StockReason::Received);
+    app(AdjustStockAction::class)->execute($variant, -1, StockReason::Sold);
+
+    Event::assertNotDispatched(StockRanLow::class);
+
+    // Restocked above it, then sold back down across it: one event.
+    app(AdjustStockAction::class)->execute($variant, 10, StockReason::Received);
+    app(AdjustStockAction::class)->execute($variant, -9, StockReason::Sold);
+    app(AdjustStockAction::class)->execute($variant, -1, StockReason::Sold);
+
+    Event::assertDispatchedTimes(StockRanLow::class, 1);
+});
+
+it('fires the low-stock event when a reservation crosses the threshold', function (): void {
+    config()->set('shops.inventory.low_stock_threshold', 2);
+    Event::fake([StockRanLow::class]);
+    $variant = ProductVariant::factory()->create(['stock' => 4, 'reserved' => 0]);
+
+    app(AdjustStockAction::class)->execute($variant, 3, StockReason::Reserved);
+
+    Event::assertDispatchedTimes(StockRanLow::class, 1);
+});

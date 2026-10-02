@@ -9,8 +9,8 @@ use Illuminate\Foundation\Events\Dispatchable;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 
 /**
- * Fired when a tracked variant's available stock drops to or below the
- * configured low-stock threshold.
+ * Fired when an adjustment takes a tracked variant's available stock from above the
+ * configured low-stock threshold to at or below it — once per crossing.
  */
 final class StockRanLow implements ShouldDispatchAfterCommit
 {

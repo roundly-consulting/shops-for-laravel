@@ -17,7 +17,7 @@ use RoundlyConsulting\Shops\ShopsManager;
 /**
  * One variant's stock, returned by `Shops::inventory($variant)`. Every change writes an
  * auditable StockAdjustment row under the variant's row lock, fires StockAdjusted (and
- * StockRanLow at the threshold), and optionally points at the model that caused it — a
+ * StockRanLow on crossing the low-stock threshold), and optionally points at the model that caused it — a
  * purchase order, an RMA, the order a return came back from.
  */
 final readonly class InventoryHandle
