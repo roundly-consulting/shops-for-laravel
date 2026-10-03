@@ -129,6 +129,22 @@ it('refuses a malformed product attribute definition instead of skipping it (str
     'a non-array entry' => [['colour' => 'string']],
 ]);
 
+it('names the shops key when a product attribute definition is invalid (strict config)', function (string $leaf, mixed $value): void {
+    // The definitions are parsed by attributes' DefinitionFactory, whose messages default to
+    // `attributes.definitions.<name>` — a key this host never set. They must name the shops one.
+    config()->set('shops.attributes.definitions', ['colour' => [$leaf => $value]]);
+
+    $provider = new ShopsServiceProvider(app());
+    $provider->register();
+
+    expect(fn () => $provider->boot())
+        ->toThrow(InvalidConfigurationException::class, "[shops.attributes.definitions.colour.{$leaf}]");
+})->with([
+    'a type typo' => ['type', 'strng'],
+    'a junk required flag' => ['required', 'maybe'],
+    'non-array rules' => ['rules', 'required|string'],
+]);
+
 it('reports a broken setting as INVALID in about (strict config)', function (): void {
     config()->set('shops.pricing.price_type', 'gros');
     config()->set('shops.inventory.low_stock_threshold', 'five');

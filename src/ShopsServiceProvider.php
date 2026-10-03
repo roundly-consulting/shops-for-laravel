@@ -123,7 +123,7 @@ final class ShopsServiceProvider extends PackageServiceProvider
         $registry = $this->app->make(AttributeRegistry::class);
 
         foreach ($definitions as $name => $definition) {
-            $registry->define(DefinitionFactory::fromArray($name, $definition));
+            $registry->define(DefinitionFactory::fromArray($name, $definition, source: 'shops.attributes.definitions'));
         }
     }
 
