@@ -123,7 +123,7 @@ return [
 | Key | Type | Default | Env | Description |
 |---|---|---|---|---|
 | `shop_model` | `class-string` | `Shops\Shop::class` | `SHOPS_SHOP_MODEL` | The Eloquent tenant model every owned record points at via its `shop_id` foreign key. Swap in your own model to extend it. |
-| `key_type` | `string` | `bigint` | `SHOPS_KEY_TYPE` | Key type of the polymorphic `customer` / `owner` / `reference` columns (orders, carts, stock adjustments): `bigint`, `uuid` or `ulid` — match your customer/owner models' keys. Anything else falls back to `bigint`. Fixed when the migrations first run. |
+| `key_type` | `string` | `bigint` | `SHOPS_KEY_TYPE` | Key type of the polymorphic `customer` / `owner` / `reference` columns (orders, carts, stock adjustments): `bigint`, `uuid` or `ulid` — match your customer/owner models' keys. Anything else throws an `InvalidConfigurationException`. Fixed when the migrations first run. |
 | `pricing.price_type` | `string` | `gross` | `SHOPS_PRICE_TYPE` | `gross` (tax is extracted from the stored price) or `net` (tax is added on top). |
 | `pricing.default_currency` | `string` | `EUR` | `SHOPS_DEFAULT_CURRENCY` | ISO-4217 fallback currency: for a shop without its own `currency`, an order without a shop, and a shop-less product's default variant. Carts carry their own currency and orders snapshot theirs. |
 | `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. |
@@ -152,7 +152,8 @@ return [
 | `orders.number_generator` | `class-string` | `DefaultNumberGenerator::class` | — | The class used to generate an order number. Must implement `NumberGenerator`. |
 
 The `bool` switches accept `true`/`false`, `1`/`0`, `on`/`off` and `yes`/`no`, so any env
-spelling works.
+spelling works. Anything else throws an `InvalidConfigurationException` naming the key, so a
+typo never quietly becomes the default.
 
 ## Usage
 
