@@ -67,11 +67,11 @@ it('uses the config floor directly when no shop is given', function (): void {
     expect(app(DatabaseTaxResolver::class)->rateFor(null, 'reduced')->basisPoints)->toBe(1000);
 });
 
-it('resolves to zero when neither database nor config provide a rate', function (): void {
+it('falls back to the shipped standard rate when neither database nor config map has one', function (): void {
     config()->set('shops.tax_classes', []);
     $shop = Shop::factory()->create();
 
-    expect(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard')->isZero())->toBeTrue();
+    expect(app(DatabaseTaxResolver::class)->rateFor($shop, 'standard')->basisPoints)->toBe(2000);
 });
 
 it('is constructable from the container and is the bound default resolver', function (): void {

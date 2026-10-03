@@ -19,10 +19,12 @@ it('falls back to the standard class for an unknown tax class', function (): voi
     expect((new ConfigTaxResolver)->rateFor(null, 'made-up')->basisPoints)->toBe(2000);
 });
 
-it('falls back to zero when even the standard class is missing', function (): void {
+it('falls back to the shipped standard rate when the map leaves standard out', function (): void {
     config()->set('shops.tax_classes', []);
 
-    expect((new ConfigTaxResolver)->rateFor(null, 'anything')->isZero())->toBeTrue();
+    expect((new ConfigTaxResolver)->rateFor(null, 'anything')->basisPoints)->toBe(2000)
+        ->and((new ConfigTaxResolver)->rateFor(null, 'reduced')->basisPoints)->toBe(1000)
+        ->and((new ConfigTaxResolver)->rateFor(null, 'zero')->isZero())->toBeTrue();
 });
 
 it('carries the requested tax class and country on the value', function (): void {

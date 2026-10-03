@@ -18,8 +18,8 @@ use RoundlyConsulting\Shops\Shops\TaxRate;
  *   2. the shop's class default: the `is_default` rate, a country-agnostic one first, else a
  *      country-specific one (a German shop's DE rate as its default for everywhere else)
  *   3. the highest-priority rate for the class within the shop
- *   4. the config floor (`shops.tax_classes`) via {@see ConfigTaxResolver}
- *   5. a zero rate
+ *   4. the config floor (`shops.tax_classes`) via {@see ConfigTaxResolver}, which always has
+ *      a `standard` rate (its shipped 20 % when not set)
  *
  * Ties are broken by `priority` descending then `id` ascending. The shop's rates
  * are fetched in one query and picked in PHP.

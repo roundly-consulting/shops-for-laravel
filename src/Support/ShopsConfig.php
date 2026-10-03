@@ -19,6 +19,12 @@ use RoundlyConsulting\Shops\Orders\Enums\PriceType;
  */
 final class ShopsConfig
 {
+    /**
+     * The whole-percent rate each shipped tax class takes when its rate is not set — the same
+     * values `config/shops.php` ships, so a blank `SHOPS_TAX_RATE=` charges 20 %, never 0 %.
+     */
+    public const array TAX_RATE_DEFAULTS = ['standard' => 20, 'reduced' => 10, 'zero' => 0];
+
     public static function priceType(): PriceType
     {
         return Config::enum('shops.pricing.price_type', PriceType::class, PriceType::Gross);
@@ -37,16 +43,22 @@ final class ShopsConfig
     }
 
     /**
-     * The configured whole-number tax rates (0..100 %) by class. A class whose rate is not set
-     * (null or blank) reads as 0 %, the integer reader's default.
+     * The whole-number tax rates (0..100 %) by class, always including `standard`. A shipped
+     * class whose rate is not set (absent, null or blank) takes its shipped rate
+     * ({@see self::TAX_RATE_DEFAULTS}); a host class whose rate is not set is left out, so it
+     * resolves like any unknown class — at the `standard` rate. An explicit `0` stays 0 %.
      *
      * @return array<string, int>
      */
     public static function taxRates(): array
     {
-        $rates = [];
+        $rates = self::TAX_RATE_DEFAULTS;
 
         foreach (self::map('shops.tax_classes') as $class => $rate) {
+            if (self::blank($rate)) {
+                continue;
+            }
+
             $rates[(string) $class] = Config::for(["shops.tax_classes.{$class}" => $rate])
                 ->integer("shops.tax_classes.{$class}", 0, min: 0, max: 100);
         }

@@ -34,17 +34,51 @@ it('refuses a junk tax rate instead of charging 0 % (strict config)', function (
     'word' => 'twenty',
     'decimal' => '19.5',
     'over 100 %' => 101,
+    'over 100 % string' => '101',
     'negative' => '-1',
 ]);
 
-it('reads a blank tax rate as not set, so the class takes the 0 % default (strict config)', function (string $blank): void {
-    // A host's `SHOPS_TAX_RATE=` line: blank is "not set", the same as a null rate — the integer
-    // reader's default of 0 %, never the shipped 20 %.
-    config()->set('shops.tax_classes', ['standard' => $blank, 'reduced' => 10]);
+it('reads a standard tax rate that is not set as the shipped 20 %, never 0 % (strict config)', function (array $classes): void {
+    // A host's `SHOPS_TAX_RATE=` line is blank, not "no tax": not set — blank, null or left out —
+    // takes the shipped 20 %, the same rate the shipped config file declares.
+    config()->set('shops.tax_classes', $classes);
 
-    expect((new ConfigTaxResolver)->rateFor(null, 'standard')->basisPoints)->toBe(0)
-        ->and((new ConfigTaxResolver)->rateFor(null, 'reduced')->basisPoints)->toBe(1000);
-})->with(['empty' => '', 'whitespace' => '  ']);
+    expect((new ConfigTaxResolver)->rateFor(null, 'standard')->basisPoints)->toBe(2000)
+        ->and((new ConfigTaxResolver)->rateFor(null, 'unknown')->basisPoints)->toBe(2000);
+})->with([
+    'blank' => [['standard' => '']],
+    'whitespace' => [['standard' => '  ']],
+    'null' => [['standard' => null]],
+    'absent' => [['reduced' => 10]],
+]);
+
+it('reads every shipped tax class that is not set as its shipped rate (strict config)', function (mixed $notSet): void {
+    config()->set('shops.tax_classes', ['standard' => $notSet, 'reduced' => $notSet, 'zero' => $notSet]);
+
+    expect(ShopsConfig::taxRates())->toBe(['standard' => 20, 'reduced' => 10, 'zero' => 0]);
+})->with(['blank' => '', 'whitespace' => '  ', 'null' => null]);
+
+it('falls a host tax class that is not set back to the standard rate (strict config)', function (mixed $notSet): void {
+    config()->set('shops.tax_classes', ['standard' => 19, 'luxury' => $notSet]);
+
+    expect(ShopsConfig::taxRates())->toBe(['standard' => 19, 'reduced' => 10, 'zero' => 0])
+        ->and((new ConfigTaxResolver)->rateFor(null, 'luxury')->basisPoints)->toBe(1900);
+})->with(['blank' => '', 'whitespace' => '  ', 'null' => null]);
+
+it('keeps an explicit 0 % standard rate (strict config)', function (int|string $zero): void {
+    config()->set('shops.tax_classes', ['standard' => $zero]);
+
+    expect((new ConfigTaxResolver)->rateFor(null, 'standard')->isZero())->toBeTrue();
+})->with(['integer' => 0, 'env string' => '0']);
+
+it('defaults every tax class to the rate the shipped config file declares (strict config)', function (): void {
+    /** @var array{tax_classes: array<string, mixed>} $shipped */
+    $shipped = require __DIR__.'/../../config/shops.php';
+
+    config()->set('shops.tax_classes', []);
+
+    expect(ShopsConfig::taxRates())->toBe($shipped['tax_classes']);
+});
 
 it('reads a canonical integer-string tax rate from env (strict config)', function (): void {
     config()->set('shops.tax_classes', ['standard' => '21', 'reduced' => 10]);
@@ -148,7 +182,7 @@ it('reads blank buckets, disk, locale and media limits as not set (strict config
         ->and(ShopsConfig::maxFileSize())->toBeNull()
         ->and(ShopsConfig::fallbackLocale())->toBe('de')
         ->and(ShopsConfig::storeCreditBucket())->toBe('store_credit')
-        ->and(ShopsConfig::taxRates())->toBe([])
+        ->and(ShopsConfig::taxRates())->toBe(['standard' => 20, 'reduced' => 10, 'zero' => 0])
         ->and(ShopsConfig::attributeDefinitions())->toBe([]);
 
     config()->set('app.fallback_locale', $blank);

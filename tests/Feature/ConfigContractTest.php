@@ -29,8 +29,8 @@ it('ships exactly the config keys it reads', function (): void {
         // `shops.tax_classes` is a host-authored MAP (tax class name => whole-number
         // rate), read wholesale by ConfigTaxResolver and looked up by a name that comes
         // from the product, not from this file. These three are shipped defaults —
-        // sample data, not a fixed schema — so no code reads them by leaf and none
-        // should. `allowUnread` is rot-proof: rename one and this entry goes stale,
+        // ShopsConfig::TAX_RATE_DEFAULTS mirrors them for a rate that is not set, but
+        // no code reads them by leaf and none should. `allowUnread` is rot-proof: rename one and this entry goes stale,
         // which is itself a failure.
         'allowUnread' => [
             'shops.tax_classes.standard',
