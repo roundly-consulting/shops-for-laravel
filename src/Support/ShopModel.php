@@ -17,8 +17,8 @@ use RoundlyConsulting\Shops\Shops\Shop;
  * configurable models, a host may point this at a tenant model of its own
  * (a Team, an Account, a Site) that has no reason to extend ours — every owned
  * record only ever needs its primary key, through a plain `shop_id` column. So
- * the toolkit's is-a-Model validation is exactly this key's contract, and a
- * non-Shop model must be honoured rather than quietly replaced.
+ * the toolkit's resolver is widened to `base: Model::class` — any Eloquent model is
+ * this key's contract, and a non-Shop model must be honoured rather than refused.
  *
  * A host that wants the package's own tenant behaviour (translations, tax rates,
  * `Shop::current()`, and the sluggable-backed slug + route key it inherits)
@@ -29,7 +29,8 @@ final class ShopModel
     /** @return class-string<Model> */
     public static function class(): string
     {
-        return ModelResolver::for('shops.shop_model', Shop::class);
+        // Shop is a suggestion, not a base: any Eloquent model may be the tenant.
+        return ModelResolver::for('shops.shop_model', Shop::class, base: Model::class);
     }
 
     /** @return Builder<Model> */
