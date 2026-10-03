@@ -13,6 +13,7 @@ use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\Money\Money;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
 
 /**
@@ -127,7 +128,7 @@ trait HasVariants
 
         return $shop instanceof Shop
             ? $shop->currency()
-            : Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
+            : Currency::of(ShopsConfig::defaultCurrency());
     }
 
     /**
@@ -136,7 +137,7 @@ trait HasVariants
      */
     protected function defaultVariantSku(): string
     {
-        $slug = $this->slugFor((string) config('shops.locales.fallback', 'en'))
+        $slug = $this->slugFor(ShopsConfig::fallbackLocale())
             ?? $this->currentSlug()
             ?? (string) $this->getKey();
 

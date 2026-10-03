@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Shops\Products\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * A single public `banner` image for the bundled Category model, built on
@@ -38,6 +39,6 @@ trait HasCategoryMedia
 
     public function bannerBucket(): string
     {
-        return (string) config('shops.media.banner_bucket', 'banner');
+        return ShopsConfig::bannerBucket();
     }
 }

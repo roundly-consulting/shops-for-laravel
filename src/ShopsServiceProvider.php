@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Shops;
 
+use Closure;
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Attributes\Registry\AttributeRegistry;
 use RoundlyConsulting\Attributes\Registry\DefinitionFactory;
 use RoundlyConsulting\Money\Currency;
 use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
 use RoundlyConsulting\PackageToolkit\Support\Config;
@@ -28,6 +30,7 @@ use RoundlyConsulting\Shops\Shipping\FreeShippingMethod;
 use RoundlyConsulting\Shops\Shops\CurrentShop;
 use RoundlyConsulting\Shops\Support\CouponModel;
 use RoundlyConsulting\Shops\Support\ShopModel;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 use RoundlyConsulting\Shops\Support\Tax\DatabaseTaxResolver;
 
 final class ShopsServiceProvider extends PackageServiceProvider
@@ -49,8 +52,8 @@ final class ShopsServiceProvider extends PackageServiceProvider
             ->contributesToAbout(static fn (): array => [
                 'Shop model' => class_basename(ShopModel::class()),
                 'Coupon model' => class_basename(CouponModel::class()),
-                'Currency' => Currency::of((string) config('shops.pricing.default_currency', 'EUR'))->code,
-                'Price type' => (string) config('shops.pricing.price_type', 'gross'),
+                'Currency' => self::orInvalid(static fn (): string => Currency::of(ShopsConfig::defaultCurrency())->code),
+                'Price type' => self::orInvalid(static fn (): string => ShopsConfig::priceType()->value),
                 'Tax resolver' => self::className('shops.tax.resolver', DatabaseTaxResolver::class),
                 'Tax classes' => self::size('shops.tax_classes', 'defined'),
                 'Payment gateway' => self::className('shops.payment.gateway', NullPaymentGateway::class),
@@ -58,14 +61,14 @@ final class ShopsServiceProvider extends PackageServiceProvider
                 'Shipping method' => self::className('shops.shipping.method', FreeShippingMethod::class),
                 'Discount resolver' => self::className('shops.discounts.resolver', CouponPackageDiscountResolver::class),
                 'Order numbers' => self::className('shops.orders.number_generator', DefaultNumberGenerator::class),
-                'Low stock threshold' => (string) (int) config('shops.inventory.low_stock_threshold', 0),
+                'Low stock threshold' => self::orInvalid(static fn (): string => (string) ShopsConfig::lowStockThreshold()),
                 'Product attributes' => self::size('shops.attributes.definitions', 'defined'),
                 'Catalog media' => self::media(),
                 'Verified purchases' => self::className(
                     'shops.reviews.verified_purchase_resolver',
                     NullVerifiedPurchaseResolver::class,
                 ),
-                'Fallback locale' => (string) config('shops.locales.fallback', 'en'),
+                'Fallback locale' => self::orInvalid(ShopsConfig::fallbackLocale(...)),
                 'Slug history' => Config::boolean('shops.slugs.history') ? 'ON' : 'OFF',
             ]);
     }
@@ -111,20 +114,16 @@ final class ShopsServiceProvider extends PackageServiceProvider
      */
     private function registerProductAttributes(): void
     {
-        $definitions = config('shops.attributes.definitions', []);
+        $definitions = ShopsConfig::attributeDefinitions();
 
-        if (! is_array($definitions) || $definitions === []) {
+        if ($definitions === []) {
             return;
         }
 
         $registry = $this->app->make(AttributeRegistry::class);
 
         foreach ($definitions as $name => $definition) {
-            if (! is_array($definition)) {
-                continue;
-            }
-
-            $registry->define(DefinitionFactory::fromArray((string) $name, $definition));
+            $registry->define(DefinitionFactory::fromArray($name, $definition));
         }
     }
 
@@ -177,15 +176,28 @@ final class ShopsServiceProvider extends PackageServiceProvider
      */
     private static function media(): string
     {
-        $disk = config('shops.media.disk');
-        $widths = config('shops.media.responsive_widths');
         $visibility = Config::boolean('shops.media.public', true) ? 'public' : 'private';
 
-        return sprintf(
+        return self::orInvalid(static fn (): string => sprintf(
             '%s, %s, %d width(s)',
-            filled($disk) ? 'disk SET' : 'MEDIA DEFAULT',
+            ShopsConfig::mediaDisk() !== null ? 'disk SET' : 'MEDIA DEFAULT',
             $visibility,
-            is_array($widths) ? count($widths) : 0,
-        );
+            count(ShopsConfig::responsiveWidths() ?? []),
+        ));
+    }
+
+    /**
+     * A strict read for an `about` row: a broken value renders as INVALID rather than as
+     * the default it no longer falls back to, and `about` keeps working.
+     *
+     * @param  Closure(): string  $read
+     */
+    private static function orInvalid(Closure $read): string
+    {
+        try {
+            return $read();
+        } catch (InvalidConfigurationException) {
+            return 'INVALID';
+        }
     }
 }

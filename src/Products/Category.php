@@ -16,6 +16,7 @@ use RoundlyConsulting\Shops\Concerns\HasTranslations;
 use RoundlyConsulting\Shops\Contracts\Translatable;
 use RoundlyConsulting\Shops\Database\Factories\CategoryFactory;
 use RoundlyConsulting\Shops\Products\Concerns\HasCategoryMedia;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
 use RoundlyConsulting\Sluggable\Definitions\SlugDefinition;
@@ -70,7 +71,7 @@ final class Category extends Model implements HasMedia, Sluggable, Translatable
                 ->from('name')
                 ->localized()
                 ->uniqueWithin('shop_id')
-                ->fallbackLocale(fn (): string => (string) config('shops.locales.fallback', 'en'))
+                ->fallbackLocale(fn (): string => ShopsConfig::fallbackLocale())
                 ->keepHistory(Config::boolean('shops.slugs.history'))
                 ->routeKey(),
         );

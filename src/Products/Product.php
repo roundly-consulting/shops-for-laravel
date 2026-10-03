@@ -26,6 +26,7 @@ use RoundlyConsulting\Shops\Products\Concerns\HasOptions;
 use RoundlyConsulting\Shops\Products\Concerns\HasProductMedia;
 use RoundlyConsulting\Shops\Products\Concerns\HasVariants;
 use RoundlyConsulting\Shops\Reviews\Contracts\VerifiedPurchaseResolver;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
 use RoundlyConsulting\Sluggable\Definitions\SlugDefinition;
@@ -101,7 +102,7 @@ final class Product extends Model implements HasAttributesContract, HasMedia, Sl
                 ->from('name')
                 ->localized()
                 ->uniqueWithin('shop_id')
-                ->fallbackLocale(fn (): string => (string) config('shops.locales.fallback', 'en'))
+                ->fallbackLocale(fn (): string => ShopsConfig::fallbackLocale())
                 ->keepHistory(Config::boolean('shops.slugs.history'))
                 ->routeKey(),
         );

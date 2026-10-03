@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use RoundlyConsulting\Credits\Interfaces\Creditable;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Shops\Orders\Events\OrderRefunded;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * When store-credit refunds are enabled (`shops.payment.refund_to_store_credit`),
@@ -37,7 +38,7 @@ final class GrantStoreCreditOnRefund
             return;
         }
 
-        $bucket = (string) config('shops.payment.store_credit_bucket', 'store_credit');
+        $bucket = ShopsConfig::storeCreditBucket();
         $currency = $customer->creditsCurrency($bucket);
 
         if ($currency === null || ! $currency->equals($final->currency())) {

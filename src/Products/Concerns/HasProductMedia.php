@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Shops\Products\Concerns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * First-class catalog media for the bundled Product model, built on
@@ -80,11 +81,11 @@ trait HasProductMedia
 
     public function featuredBucket(): string
     {
-        return (string) config('shops.media.featured_bucket', 'featured');
+        return ShopsConfig::featuredBucket();
     }
 
     public function galleryBucket(): string
     {
-        return (string) config('shops.media.gallery_bucket', 'gallery');
+        return ShopsConfig::galleryBucket();
     }
 }

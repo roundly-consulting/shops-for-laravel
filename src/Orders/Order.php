@@ -31,6 +31,7 @@ use RoundlyConsulting\Shops\Shops\CurrentShop;
 use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\ShopsManager;
 use RoundlyConsulting\Shops\Support\Casts\AddressCast;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * @property int $id
@@ -94,11 +95,11 @@ final class Order extends Model
     {
         if (($this->getAttributes()['currency'] ?? null) === null) {
             $this->currency = $this->resolveShopForCurrency()?->currency()
-                ?? Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
+                ?? Currency::of(ShopsConfig::defaultCurrency());
         }
 
         if (($this->getAttributes()['price_type'] ?? null) === null) {
-            $this->price_type = PriceType::from((string) config('shops.pricing.price_type', 'gross'));
+            $this->price_type = ShopsConfig::priceType();
         }
 
         $this->assignNumber();

@@ -12,6 +12,7 @@ use RoundlyConsulting\Shops\Inventory\Events\StockRanLow;
 use RoundlyConsulting\Shops\Inventory\Exceptions\InsufficientStockException;
 use RoundlyConsulting\Shops\Inventory\StockAdjustment;
 use RoundlyConsulting\Shops\Products\ProductVariant;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * Applies a signed stock delta to a variant inside a row-locked transaction,
@@ -147,7 +148,7 @@ final class AdjustStockAction
             return;
         }
 
-        $threshold = (int) config('shops.inventory.low_stock_threshold', 0);
+        $threshold = ShopsConfig::lowStockThreshold();
 
         if ($availableBefore > $threshold && $variant->availableStock() <= $threshold) {
             StockRanLow::dispatch($variant, $threshold);

@@ -15,6 +15,7 @@ use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 use RoundlyConsulting\Shops\Support\Tax\TaxRateValue;
 
 /**
@@ -57,7 +58,7 @@ trait HasPrice
 
             // The order's own snapshotted currency — never the (changeable) config.
             $currency = $this->getAttribute('currency');
-            $currency = $currency instanceof Currency ? $currency : Currency::of((string) config('shops.pricing.default_currency', 'EUR'));
+            $currency = $currency instanceof Currency ? $currency : Currency::of(ShopsConfig::defaultCurrency());
             $discount = $this->getAttribute('discount');
             $shipping = $this->getAttribute('shipping_cost');
             $priceType = $this->getAttribute('price_type');
@@ -69,7 +70,7 @@ trait HasPrice
                 // The snapshotted price type; config only for an order not yet inserted.
                 priceType: $priceType instanceof PriceType
                     ? $priceType
-                    : PriceType::from((string) config('shops.pricing.price_type', 'gross')),
+                    : ShopsConfig::priceType(),
                 taxResolver: null,
                 discount: $discount instanceof Money ? $discount : null,
                 freeShipping: (bool) $this->getAttribute('free_shipping'),

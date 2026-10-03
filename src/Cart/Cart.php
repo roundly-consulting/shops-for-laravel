@@ -20,10 +20,10 @@ use RoundlyConsulting\Shops\Database\Factories\CartFactory;
 use RoundlyConsulting\Shops\Exceptions\InvalidQuantityException;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\Price;
 use RoundlyConsulting\Shops\Orders\DataTransferObjects\PriceLine;
-use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 use RoundlyConsulting\Shops\Products\ProductVariant;
 use RoundlyConsulting\Shops\Shops\Shop;
 use RoundlyConsulting\Shops\ShopsManager;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * @property int $id
@@ -104,7 +104,7 @@ final class Cart extends Model
         }
 
         $shop = $this->shop_id !== null && $this->shop instanceof Shop ? $this->shop : null;
-        $priceType = PriceType::from((string) config('shops.pricing.price_type', 'gross'));
+        $priceType = ShopsConfig::priceType();
 
         $base = new Price(
             lines: $lines,

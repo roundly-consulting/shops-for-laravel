@@ -9,6 +9,7 @@ use RoundlyConsulting\MediaLibrary\Buckets\MediaBucket;
 use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
 use RoundlyConsulting\PackageToolkit\Support\Config;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * The `shops.media` settings every catalog bucket shares — product featured/gallery, variant
@@ -37,9 +38,9 @@ trait ConfiguresCatalogMedia
     {
         $bucket->acceptsMimeTypes($this->catalogImageMimeTypes());
 
-        $disk = config('shops.media.disk');
+        $disk = ShopsConfig::mediaDisk();
 
-        if (is_string($disk) && $disk !== '') {
+        if ($disk !== null) {
             $bucket->useDisk($disk);
         }
 
@@ -49,14 +50,12 @@ trait ConfiguresCatalogMedia
             $bucket->private();
         }
 
-        $widths = config('shops.media.responsive_widths');
+        $bucket->responsiveWidths(ShopsConfig::responsiveWidths());
 
-        $bucket->responsiveWidths(is_array($widths) ? $this->catalogWidths($widths) : null);
+        $maxSize = ShopsConfig::maxFileSize();
 
-        $maxSize = config('shops.media.max_file_size');
-
-        if (is_numeric($maxSize) && (int) $maxSize > 0) {
-            $bucket->maxFileSize((int) $maxSize);
+        if ($maxSize !== null) {
+            $bucket->maxFileSize($maxSize);
         }
 
         return $bucket;
@@ -73,22 +72,5 @@ trait ConfiguresCatalogMedia
         }
 
         return $media->getUrl($variant !== '' && $media->hasGeneratedVariant($variant) ? $variant : '');
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $widths
-     * @return list<int>
-     */
-    private function catalogWidths(array $widths): array
-    {
-        $clean = [];
-
-        foreach ($widths as $width) {
-            if (is_int($width) && $width > 0) {
-                $clean[] = $width;
-            }
-        }
-
-        return $clean;
     }
 }

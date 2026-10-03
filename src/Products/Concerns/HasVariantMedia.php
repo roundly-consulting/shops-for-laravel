@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Shops\Products\Concerns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * Per-variant catalog media built on media-library, so a colour/size variant can
@@ -50,6 +51,6 @@ trait HasVariantMedia
 
     public function variantGalleryBucket(): string
     {
-        return (string) config('shops.media.variant_bucket', 'gallery');
+        return ShopsConfig::variantBucket();
     }
 }

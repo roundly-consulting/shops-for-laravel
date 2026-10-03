@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Shops\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * Stores translatable attributes as native JSON maps keyed by locale, with no
@@ -95,6 +96,6 @@ trait HasTranslations
 
     protected function fallbackLocale(): string
     {
-        return (string) config('shops.locales.fallback', config('app.fallback_locale', 'en'));
+        return ShopsConfig::fallbackLocale();
     }
 }

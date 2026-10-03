@@ -19,6 +19,7 @@ use RoundlyConsulting\Shops\Products\Category;
 use RoundlyConsulting\Shops\Products\Product;
 use RoundlyConsulting\Shops\ShopsManager;
 use RoundlyConsulting\Shops\Support\ShopModel;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
 use RoundlyConsulting\Sluggable\Definitions\SlugDefinition;
@@ -81,7 +82,7 @@ class Shop extends Model implements Sluggable, Translatable
                 ->from('name')
                 ->localized()
                 ->unique()
-                ->fallbackLocale(fn (): string => (string) config('shops.locales.fallback', 'en'))
+                ->fallbackLocale(fn (): string => ShopsConfig::fallbackLocale())
                 ->keepHistory(Config::boolean('shops.slugs.history'))
                 ->routeKey(),
         );
@@ -137,7 +138,7 @@ class Shop extends Model implements Sluggable, Translatable
         /** @var string|null $currency */
         $currency = $this->getAttribute('currency');
 
-        return Currency::of($currency ?? (string) config('shops.pricing.default_currency', 'EUR'));
+        return Currency::of($currency ?? ShopsConfig::defaultCurrency());
     }
 
     /**

@@ -14,6 +14,7 @@ use RoundlyConsulting\Shops\Orders\Order;
 use RoundlyConsulting\Shops\Payments\Exceptions\StoreCreditAlreadyAppliedException;
 use RoundlyConsulting\Shops\Payments\Exceptions\StoreCreditBucketNotDenominated;
 use RoundlyConsulting\Shops\Payments\Exceptions\StoreCreditCurrencyMismatch;
+use RoundlyConsulting\Shops\Support\ShopsConfig;
 
 /**
  * Pays for an order with the buyer's store credit — a credits-for-laravel bucket
@@ -156,6 +157,6 @@ final class StoreCreditTender
 
     private function bucket(): string
     {
-        return (string) config('shops.payment.store_credit_bucket', 'store_credit');
+        return ShopsConfig::storeCreditBucket();
     }
 }
