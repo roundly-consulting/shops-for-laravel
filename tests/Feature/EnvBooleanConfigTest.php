@@ -6,6 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use RoundlyConsulting\Addresses\DataTransferObjects\AddressData;
 use RoundlyConsulting\Addresses\Enums\AddressType;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\Shops\Facades\Shops;
 use RoundlyConsulting\Shops\Orders\Item;
 use RoundlyConsulting\Shops\Orders\Order;
@@ -116,3 +117,17 @@ it('reports the switches in about exactly as behaviour reads them', function ():
         ->and($rows['catalog_media'])->toContain('private')
         ->and($rows['slug_history'])->toBe('OFF');
 });
+
+it('refuses a mistyped switch (strict config)', function (string $key, Closure $read): void {
+    config()->set($key, 'disabled');
+
+    expect($read)->toThrow(
+        InvalidConfigurationException::class,
+        "Configuration value [{$key}] must be a boolean (true/false, 1/0, on/off or yes/no), [disabled] given.",
+    );
+})->with([
+    'slug history' => ['shops.slugs.history', fn () => Product::factory()->create()],
+    'billing same as shipping' => ['shops.addresses.billing_same_as_shipping', fn () => Shops::addresses()->defaults(Customer::create(['name' => 'Ada']))],
+    'store-credit tender in about' => ['shops.payment.allow_store_credit', fn () => shopsAboutRows()],
+    'media visibility in about' => ['shops.media.public', fn () => shopsAboutRows()],
+]);
