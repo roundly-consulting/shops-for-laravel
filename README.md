@@ -126,7 +126,7 @@ return [
 | `key_type` | `string` | `bigint` | `SHOPS_KEY_TYPE` | Key type of the polymorphic `customer` / `owner` / `reference` columns (orders, carts, stock adjustments): `bigint`, `uuid` or `ulid` — match your customer/owner models' keys. Anything else throws an `InvalidConfigurationException`. Fixed when the migrations first run. |
 | `pricing.price_type` | `string` | `gross` | `SHOPS_PRICE_TYPE` | `gross` (tax is extracted from the stored price) or `net` (tax is added on top). Anything else throws an `InvalidConfigurationException` listing both. |
 | `pricing.default_currency` | `string` | `EUR` | `SHOPS_DEFAULT_CURRENCY` | ISO-4217 fallback currency: for a shop without its own `currency`, an order without a shop, and a shop-less product's default variant. Carts carry their own currency and orders snapshot theirs. |
-| `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. Each rate is `0`–`100` (an `int` or a string such as `"21"`); `"twenty"` or `"19.5"` throws instead of becoming 0 %. A blank rate (`SHOPS_TAX_RATE=`) is not set and reads as `0` %, like a `null` one. |
+| `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. Each rate is `0`–`100` (an `int` or a string such as `"21"`); `"twenty"` or `"19.5"` throws instead of becoming 0 %. A shipped class whose rate is not set — left out, `null` or blank (`SHOPS_TAX_RATE=`) — takes its shipped rate (`standard` 20 %, `reduced` 10 %, `zero` 0 %), never 0 %; one of your own classes that is not set uses the `standard` rate. Set `0` explicitly for no tax. |
 | `tax.resolver` | `class-string` | `DatabaseTaxResolver::class` | — | Resolves the rate for a `(shop, class, country)` lookup. Defaults to per-shop database rates with the config map as the floor. Bind `ConfigTaxResolver` to use only the config map, or your own `TaxResolver`. |
 | `inventory.low_stock_threshold` | `int` | `0` | `SHOPS_LOW_STOCK_THRESHOLD` | `StockRanLow` fires once when an adjustment takes a tracked variant's available stock from above this level to at or below it. At least `0`; a non-integer value throws. |
 | `media.featured_bucket` | `string` | `featured` | `SHOPS_MEDIA_FEATURED_BUCKET` | Product featured-image bucket (single file). |
@@ -160,9 +160,9 @@ whitespace, such as a `SHOPS_DEFAULT_CURRENCY=` line) — takes its default; a v
 shape throws an `InvalidConfigurationException` naming the key: integers take an `int` or a
 whole-number string such as `"5"` (never `"five"` or `"5.5"`), names (currency, buckets, disk,
 locale) must be strings, and the maps and lists must be arrays (each responsive width a real
-width — a blank entry inside the list throws). A tax class whose rate is not set reads as `0`
-%, so a blank `SHOPS_TAX_RATE=` charges no tax on the `standard` class. `php artisan about` shows
-a broken setting as `INVALID`.
+width — a blank entry inside the list throws). A tax class whose rate is not set takes its
+shipped rate, so a blank `SHOPS_TAX_RATE=` still charges the shipped 20 % on the `standard` class —
+set `SHOPS_TAX_RATE=0` to charge none. `php artisan about` shows a broken setting as `INVALID`.
 
 ## Usage
 

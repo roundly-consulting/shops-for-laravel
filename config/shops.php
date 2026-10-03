@@ -78,8 +78,10 @@ return [
     |
     | Database tax rates are stored in basis points (1900 = 19.00%), but this
     | config map stays in whole percents for authoring convenience — the config
-    | fallback multiplies by 100 internally. A rate that is not set (null, or a
-    | blank SHOPS_TAX_RATE=) reads as 0%; junk such as "twenty" throws.
+    | fallback multiplies by 100 internally. A shipped class whose rate is not
+    | set (left out, null, or a blank SHOPS_TAX_RATE=) takes the rate shown
+    | below, never 0%; a class of your own that is not set uses "standard".
+    | Set 0 explicitly for no tax. Junk such as "twenty" throws.
     |
     | "resolver" is the class resolving a rate for a (shop, class, country)
     | tuple. The default DatabaseTaxResolver reads per-shop rates and falls back
