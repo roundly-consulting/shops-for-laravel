@@ -124,19 +124,19 @@ return [
 |---|---|---|---|---|
 | `shop_model` | `class-string` | `Shops\Shop::class` | `SHOPS_SHOP_MODEL` | The Eloquent tenant model every owned record points at via its `shop_id` foreign key. Swap in your own model to extend it. |
 | `key_type` | `string` | `bigint` | `SHOPS_KEY_TYPE` | Key type of the polymorphic `customer` / `owner` / `reference` columns (orders, carts, stock adjustments): `bigint`, `uuid` or `ulid` — match your customer/owner models' keys. Anything else throws an `InvalidConfigurationException`. Fixed when the migrations first run. |
-| `pricing.price_type` | `string` | `gross` | `SHOPS_PRICE_TYPE` | `gross` (tax is extracted from the stored price) or `net` (tax is added on top). |
+| `pricing.price_type` | `string` | `gross` | `SHOPS_PRICE_TYPE` | `gross` (tax is extracted from the stored price) or `net` (tax is added on top). Anything else throws an `InvalidConfigurationException` listing both. |
 | `pricing.default_currency` | `string` | `EUR` | `SHOPS_DEFAULT_CURRENCY` | ISO-4217 fallback currency: for a shop without its own `currency`, an order without a shop, and a shop-less product's default variant. Carts carry their own currency and orders snapshot theirs. |
-| `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. |
+| `tax_classes` | `array<string,int>` | `standard 20, reduced 10, zero 0` | `SHOPS_TAX_RATE` (standard) | Whole-percent fallback floor used when a shop has no matching database tax rate. Each rate is `0`–`100` (an `int` or a string such as `"21"`); `"twenty"` or `"19.5"` throws instead of becoming 0 %. |
 | `tax.resolver` | `class-string` | `DatabaseTaxResolver::class` | — | Resolves the rate for a `(shop, class, country)` lookup. Defaults to per-shop database rates with the config map as the floor. Bind `ConfigTaxResolver` to use only the config map, or your own `TaxResolver`. |
-| `inventory.low_stock_threshold` | `int` | `0` | `SHOPS_LOW_STOCK_THRESHOLD` | `StockRanLow` fires once when an adjustment takes a tracked variant's available stock from above this level to at or below it. |
+| `inventory.low_stock_threshold` | `int` | `0` | `SHOPS_LOW_STOCK_THRESHOLD` | `StockRanLow` fires once when an adjustment takes a tracked variant's available stock from above this level to at or below it. At least `0`; a non-integer value throws. |
 | `media.featured_bucket` | `string` | `featured` | `SHOPS_MEDIA_FEATURED_BUCKET` | Product featured-image bucket (single file). |
 | `media.gallery_bucket` | `string` | `gallery` | `SHOPS_MEDIA_GALLERY_BUCKET` | Product gallery bucket. |
 | `media.variant_bucket` | `string` | `gallery` | `SHOPS_MEDIA_VARIANT_BUCKET` | Variant gallery bucket. |
 | `media.banner_bucket` | `string` | `banner` | `SHOPS_MEDIA_BANNER_BUCKET` | Category banner bucket (single file). |
 | `media.disk` | `?string` | `null` (media's disk) | `SHOPS_MEDIA_DISK` | Disk for every catalog bucket. |
 | `media.public` | `bool` | `true` | `SHOPS_MEDIA_PUBLIC` | Public (CDN/SEO) or private catalog media. |
-| `media.responsive_widths` | `list<int>` | `[320, 640, 1024, 1600]` | — | Responsive ladder; each width is generated as the variant `responsive-<width>`. |
-| `media.max_file_size` | `?int` | `null` | — | Per-image cap in bytes, applied to every catalog bucket. |
+| `media.responsive_widths` | `list<int>` | `[320, 640, 1024, 1600]` | — | Responsive ladder; each width is generated as the variant `responsive-<width>`. Every width must be a positive integer — a bad entry throws rather than being dropped. |
+| `media.max_file_size` | `?int` | `null` | — | Per-image cap in bytes, applied to every catalog bucket. `null` for none; otherwise at least `1`. |
 | `reviews.verified_purchase_resolver` | `class-string` | `NullVerifiedPurchaseResolver::class` | `SHOPS_VERIFIED_PURCHASE_RESOLVER` | Decides whether a buyer's review is a verified purchase (see [Reviews](#reviews)). |
 | `attributes.definitions` | `array<string,array>` | `[]` | — | Product spec-sheet attribute definitions (see [Spec sheet](#spec-sheet-attributes)). |
 | `locales.fallback` | `string` | `app.fallback_locale` | `SHOPS_FALLBACK_LOCALE` | Locale a translatable attribute falls back to; also the locale the default variant SKU derives from. |
@@ -146,7 +146,7 @@ return [
 | `payment.store_credit_bucket` | `string` | `store_credit` | `SHOPS_STORE_CREDIT_BUCKET` | The credits bucket store credit is taken from and returned to. |
 | `payment.refund_to_store_credit` | `bool` | `false` | `SHOPS_REFUND_TO_STORE_CREDIT` | Grant a refunded order's total back as store credit. |
 | `shipping.method` | `class-string` | `FreeShippingMethod::class` | `SHOPS_SHIPPING_METHOD` | Your `ShippingMethod`; checkout quotes the shipping address through it. |
-| `discounts.coupon_model` | `class-string` | coupons' `Coupon::class` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation: coupons-for-laravel's `Coupon` or your subclass of it (anything else falls back to `Coupon`). |
+| `discounts.coupon_model` | `class-string` | coupons' `Coupon::class` | `SHOPS_COUPON_MODEL` | The Eloquent model backing an order's coupon relation: coupons-for-laravel's `Coupon` or your subclass of it (anything else throws an `InvalidConfigurationException` naming the key). |
 | `discounts.resolver` | `class-string` | `CouponPackageDiscountResolver::class` | — | The `DiscountResolver` pricing carts and snapshotting an order's discount at place-order. |
 | `addresses.billing_same_as_shipping` | `bool` | `true` | `SHOPS_BILLING_SAME_AS_SHIPPING` | Reuse the primary shipping address as billing when the customer has no billing address. |
 | `orders.number_generator` | `class-string` | `DefaultNumberGenerator::class` | — | The class used to generate an order number. Must implement `NumberGenerator`. |
@@ -154,6 +154,12 @@ return [
 The `bool` switches accept `true`/`false`, `1`/`0`, `on`/`off` and `yes`/`no`, so any env
 spelling works. Anything else throws an `InvalidConfigurationException` naming the key, so a
 typo never quietly becomes the default.
+
+The other settings are just as strict. A key you leave unset (`null`) takes its default; a value
+of the wrong shape throws an `InvalidConfigurationException` naming the key: integers take an
+`int` or a whole-number string such as `"5"` (never `"five"`, `"5.5"` or `""`), names (currency,
+buckets, disk, locale) must be non-empty strings, and the maps and lists must be arrays. `php
+artisan about` shows a broken setting as `INVALID`.
 
 ## Usage
 
