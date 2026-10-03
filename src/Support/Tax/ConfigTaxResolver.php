@@ -14,8 +14,9 @@ use RoundlyConsulting\Shops\Support\ShopsConfig;
  * ignores the shop and country — every shop gets the same configured rate.
  * Unknown classes fall back to the `standard` class, and a missing `standard`
  * entry falls back to zero. A configured rate must be a whole number 0..100 (or
- * its canonical string): `'twenty'`, `'19.5'` or `''` throw an
- * InvalidConfigurationException naming the class — never a silent 0 % rate. Used directly, or as the fallback floor for
+ * its canonical string): `'twenty'` or `'19.5'` throw an
+ * InvalidConfigurationException naming the class — never a silent 0 % rate. A
+ * rate that is not set (null or blank) reads as 0 %. Used directly, or as the fallback floor for
  * {@see DatabaseTaxResolver}.
  */
 final class ConfigTaxResolver implements TaxResolver

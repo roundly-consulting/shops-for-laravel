@@ -9,10 +9,11 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Shops\Orders\Enums\PriceType;
 
 /**
- * Strict reads of the non-boolean `shops.*` settings. An absent (null) key takes its default;
- * a present value of the wrong shape — `'twenty'` for a tax rate, a `price_type` typo, a blank
- * bucket — throws {@see InvalidConfigurationException} naming the key. Nothing is cast to 0
- * (a junk tax rate used to become a 0 % rate) or swapped for the default.
+ * Strict reads of the non-boolean `shops.*` settings. A key that is not set — absent, null or
+ * blank (`''` or whitespace, a host's `KEY=`) — takes its default; a present value of the wrong
+ * shape — `'twenty'` for a tax rate, a `price_type` typo, an array for a bucket — throws
+ * {@see InvalidConfigurationException} naming the key. Junk is never cast to 0 (a junk tax rate
+ * used to become a 0 % rate) or swapped for the default.
  *
  * @internal
  */
@@ -36,7 +37,8 @@ final class ShopsConfig
     }
 
     /**
-     * The configured whole-number tax rates (0..100 %) by class.
+     * The configured whole-number tax rates (0..100 %) by class. A class whose rate is not set
+     * (null or blank) reads as 0 %, the integer reader's default.
      *
      * @return array<string, int>
      */
@@ -72,51 +74,57 @@ final class ShopsConfig
         return self::string('shops.media.banner_bucket', 'banner');
     }
 
-    /** The catalog disk; null uses the media package's disk. */
+    /** The catalog disk; not set (null or blank) uses the media package's disk. */
     public static function mediaDisk(): ?string
     {
-        return config('shops.media.disk') === null ? null : Config::requireString('shops.media.disk');
+        return self::blank(config('shops.media.disk')) ? null : Config::requireString('shops.media.disk');
     }
 
     /**
-     * The responsive width ladder in pixels; null when unset.
+     * The responsive width ladder in pixels; null when not set. Each entry must be a width: a
+     * null or blank entry inside the list is junk, not a 1 px width.
      *
      * @return list<int>|null
      */
     public static function responsiveWidths(): ?array
     {
-        if (config('shops.media.responsive_widths') === null) {
+        if (self::blank(config('shops.media.responsive_widths'))) {
             return null;
         }
 
         $widths = [];
 
         foreach (self::map('shops.media.responsive_widths') as $index => $width) {
-            $widths[] = Config::for(["shops.media.responsive_widths.{$index}" => $width])
-                ->integer("shops.media.responsive_widths.{$index}", 1, min: 1);
+            $key = "shops.media.responsive_widths.{$index}";
+
+            if (self::blank($width)) {
+                throw InvalidConfigurationException::notAnInteger($key, $width);
+            }
+
+            $widths[] = Config::for([$key => $width])->integer($key, 1, min: 1);
         }
 
         return $widths;
     }
 
-    /** The per-image byte cap; null for none. */
+    /** The per-image byte cap; null (not set — null or blank) for none. */
     public static function maxFileSize(): ?int
     {
-        return config('shops.media.max_file_size') === null
+        return self::blank(config('shops.media.max_file_size'))
             ? null
             : Config::integer('shops.media.max_file_size', 1, min: 1);
     }
 
-    /** The locale a translatable attribute falls back to (the app's when unset). */
+    /** The locale a translatable attribute falls back to (the app's when not set). */
     public static function fallbackLocale(): string
     {
-        if (config('shops.locales.fallback') !== null) {
+        if (! self::blank(config('shops.locales.fallback'))) {
             return Config::requireString('shops.locales.fallback');
         }
 
         $app = config('app.fallback_locale');
 
-        return is_string($app) && $app !== '' ? $app : 'en';
+        return is_string($app) && ! self::blank($app) ? $app : 'en';
     }
 
     public static function storeCreditBucket(): string
@@ -144,9 +152,15 @@ final class ShopsConfig
         return $definitions;
     }
 
+    /** Not set: absent, null or a blank string (`''` or whitespace — a host's `KEY=`). */
+    public static function blank(mixed $value): bool
+    {
+        return $value === null || (is_string($value) && trim($value) === '');
+    }
+
     private static function string(string $key, string $default): string
     {
-        return config($key) === null ? $default : Config::requireString($key);
+        return self::blank(config($key)) ? $default : Config::requireString($key);
     }
 
     /**
@@ -154,7 +168,8 @@ final class ShopsConfig
      */
     private static function map(string $key): array
     {
-        $value = config($key) ?? [];
+        $value = config($key);
+        $value = self::blank($value) ? [] : $value;
 
         if (! is_array($value)) {
             throw new InvalidConfigurationException("Configuration value [{$key}] must be an array, [".get_debug_type($value).'] given.');

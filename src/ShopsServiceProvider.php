@@ -134,9 +134,9 @@ final class ShopsServiceProvider extends PackageServiceProvider
      */
     private static function className(string $key, string $default): string
     {
-        $class = config($key, $default);
+        $class = config($key);
 
-        return class_basename(is_string($class) ? $class : $default);
+        return class_basename(is_string($class) && ! ShopsConfig::blank($class) ? $class : $default);
     }
 
     /**
