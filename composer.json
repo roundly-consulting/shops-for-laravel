@@ -25,16 +25,16 @@
         "php": "^8.4",
         "ext-bcmath": "*",
         "illuminate/contracts": "^12.0|^13.0",
-        "roundly-consulting/addresses-for-laravel": "^1.0",
-        "roundly-consulting/attributes-for-laravel": "^1.0",
-        "roundly-consulting/coupons-for-laravel": "^1.0",
-        "roundly-consulting/credits-for-laravel": "^1.0",
-        "roundly-consulting/enums-for-laravel": "^1.0",
-        "roundly-consulting/media-library-for-laravel": "^1.0",
-        "roundly-consulting/money-for-laravel": "^1.0",
-        "roundly-consulting/package-toolkit-for-laravel": "^1.0",
-        "roundly-consulting/reviews-for-laravel": "^1.0",
-        "roundly-consulting/sluggable-for-laravel": "^1.0"
+        "roundly-consulting/addresses-for-laravel": "^1.0.1",
+        "roundly-consulting/attributes-for-laravel": "^1.1.0",
+        "roundly-consulting/coupons-for-laravel": "^1.1.0",
+        "roundly-consulting/credits-for-laravel": "^1.1.1",
+        "roundly-consulting/enums-for-laravel": "^1.1.0",
+        "roundly-consulting/media-library-for-laravel": "^1.1.2",
+        "roundly-consulting/money-for-laravel": "^1.0.1",
+        "roundly-consulting/package-toolkit-for-laravel": "^1.3.0",
+        "roundly-consulting/reviews-for-laravel": "^1.1.0",
+        "roundly-consulting/sluggable-for-laravel": "^1.1.1"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
@@ -47,7 +47,7 @@
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-deprecation-rules": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0",
-        "roundly-consulting/testing-for-laravel": "^1.0"
+        "roundly-consulting/testing-for-laravel": "^1.2.1"
     },
     "autoload": {
         "psr-4": {
