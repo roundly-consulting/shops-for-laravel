@@ -6,11 +6,16 @@ All notable changes to `shops-for-laravel` are documented in this file. The form
 
 ## Unreleased
 
+## 1.0.1 - 2026-10-11
+
 ### Changed
 
 - Maintenance: requires the latest roundly packages — addresses `^1.0.1`, attributes `^1.1.0`,
   coupons `^1.1.0`, credits `^1.1.1`, enums `^1.1.0`, media-library `^1.1.2`, money `^1.0.1`,
   package-toolkit `^1.3.0`, reviews `^1.1.0`, sluggable `^1.1.1`; dev: testing `^1.2.1`.
+- Maintenance: `composer.json` `homepage` and `support.docs` now point to the documentation site.
+- Documentation: the README hero image uses an absolute URL, so it renders on Packagist and other
+  sites.
 
 ## 1.0.0 - 2026-10-03
 
