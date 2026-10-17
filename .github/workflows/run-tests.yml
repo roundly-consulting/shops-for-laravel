@@ -47,22 +47,17 @@ jobs:
     runs-on: ubuntu-latest
     name: P8.4 - pgsql real-engine
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: testing
-          POSTGRES_USER: testing
-          POSTGRES_PASSWORD: secret
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
+      # Started first so the engine boots while PHP and the dependencies install. The data
+      # directory is tmpfs and durability is off: the same planner, isolation levels, locks and
+      # limits — nothing this leg proves depends on surviving a power cut.
+      - name: Start postgres
+        run: >-
+          docker run -d --name postgres --tmpfs /var/lib/postgresql/data
+          -e POSTGRES_DB=testing -e POSTGRES_USER=testing -e POSTGRES_PASSWORD=secret
+          -p 5432:5432 postgres:16
+          -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+
       - name: Checkout code
         uses: actions/checkout@v7
 
@@ -75,6 +70,16 @@ jobs:
 
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction
+
+      # The image's init server listens on the socket only, so a TCP answer means the real one is up.
+      - name: Wait for postgres
+        run: |
+          for _ in $(seq 1 90); do
+            docker exec postgres psql -h 127.0.0.1 -U testing -d testing -c 'select 1' >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          docker logs postgres
+          exit 1
 
       - name: Execute tests against postgres
         env:
