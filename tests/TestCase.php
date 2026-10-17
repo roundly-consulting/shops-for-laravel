@@ -71,6 +71,16 @@ abstract class TestCase extends PackageTestCase
     }
 
     /**
+     * Migrate once per worker and schema signature, then empty the tables after each test.
+     * The migrations read only config, which the signature covers; the order-number racer
+     * runs on its own connection and ends with SIGKILL, as this requires.
+     */
+    protected function keepsMigratedSchema(): bool
+    {
+        return true;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function configBeforeBoot(): array
