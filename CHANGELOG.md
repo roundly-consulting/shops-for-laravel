@@ -6,6 +6,13 @@ All notable changes to `shops-for-laravel` are documented in this file. The form
 
 ## Unreleased
 
+## 1.1.0 - 2026-10-17
+
+### Added
+
+- `ShopModel::shop()` returns the configured tenant class when it extends `Shop`, else `Shop`
+  itself (the class the packaged `ShopFactory` builds).
+
 ### Fixed
 
 - Factories build the configured model when a host swaps it.
