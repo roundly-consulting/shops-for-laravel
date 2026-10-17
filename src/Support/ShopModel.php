@@ -33,6 +33,20 @@ final class ShopModel
         return ModelResolver::for('shops.shop_model', Shop::class, base: Model::class);
     }
 
+    /**
+     * The configured tenant when it extends {@see Shop}, else Shop itself: the class the
+     * packaged ShopFactory builds. A host tenant of its own (a Team, an Account) has no
+     * `name`/`currency` columns for that factory to fill, so it keeps its own factory.
+     *
+     * @return class-string<Shop>
+     */
+    public static function shop(): string
+    {
+        $class = ModelResolver::for('shops.shop_model', Shop::class, base: Model::class);
+
+        return is_a($class, Shop::class, true) ? $class : Shop::class;
+    }
+
     /** @return Builder<Model> */
     public static function query(): Builder
     {

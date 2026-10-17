@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Shops\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use RoundlyConsulting\Shops\Shops\Shop;
+use RoundlyConsulting\Shops\Support\ShopModel;
 
 /**
  * @extends Factory<Shop>
@@ -13,6 +14,17 @@ use RoundlyConsulting\Shops\Shops\Shop;
 final class ShopFactory extends Factory
 {
     protected $model = Shop::class;
+
+    /**
+     * Build the tenant the host configured in `shops.shop_model` when it extends Shop, so a
+     * host subclass comes out of the factory with its own events, observers and table.
+     *
+     * @return class-string<Shop>
+     */
+    public function modelName(): string
+    {
+        return ShopModel::shop();
+    }
 
     public function definition(): array
     {

@@ -41,6 +41,8 @@ ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Shops');
 // beside an honoured config is exactly what a stray literal outside the seam is.
 ArchPresets::modelsResolveThroughSeam(__DIR__.'/../src', 'Support');
 
+ArchPresets::factoriesResolveThroughSeam(__DIR__.'/../database/factories', __DIR__.'/../src', 'Support');
+
 // The morph-key seam, guarded. Shops' `owner` (carts), `customer` (orders) and
 // `reference` (stock_adjustments) columns migrated off raw `$table->morphs()` onto
 // `morphKey($name, KeyType::fromConfig(...))` so a uuid/ulid host can flip its whole graph

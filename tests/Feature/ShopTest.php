@@ -76,6 +76,13 @@ it('honours a tenant model that does not extend the packaged shop', function ():
     expect(Shop::resolveModelClass())->toBe(Customer::class);
 });
 
+it('keeps the packaged shop in its factory for a tenant that does not extend it', function (): void {
+    config()->set('shops.shop_model', Customer::class);
+
+    // The packaged factory fills Shop's own columns; a foreign tenant brings its own factory.
+    expect(Shop::factory()->create()::class)->toBe(Shop::class);
+});
+
 it('rejects a shop model that is not an eloquent model', function (): void {
     config()->set('shops.shop_model', 'App\\Models\\NotARealClass');
 
